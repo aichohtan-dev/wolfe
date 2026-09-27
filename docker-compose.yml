@@ -1,0 +1,54 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-wolfe}
+      POSTGRES_USER: ${POSTGRES_USER:-wolfe}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the environment or .env}
+    expose: ["5432"]
+    volumes:
+      - wolfe-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL","pg_isready -U ${POSTGRES_USER:-wolfe} -d ${POSTGRES_DB:-wolfe}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server","--appendonly","yes"]
+    expose: ["6379"]
+    volumes:
+      - wolfe-redis:/data
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    environment:
+      DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-wolfe}
+      DATABASE_USERNAME: ${POSTGRES_USER:-wolfe}
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the environment or .env}
+      REDIS_URL: redis://redis:6379
+      WOLFE_JWT_SECRET: ${WOLFE_JWT_SECRET:?Set WOLFE_JWT_SECRET in the environment or .env}
+      WOLFE_JWT_TTL_SECONDS: ${WOLFE_JWT_TTL_SECONDS:-900}
+      WOLFE_FRONTEND_ORIGIN: ${WOLFE_FRONTEND_ORIGIN:?Set WOLFE_FRONTEND_ORIGIN in the environment or .env}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    expose: ["8080"]
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    depends_on:
+      - api
+    ports:
+      - "80:80"
+
+volumes:
+  wolfe-postgres:
+  wolfe-redis:

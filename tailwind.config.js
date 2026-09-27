@@ -1,0 +1,1 @@
+/** @type {import('tailwindcss').Config} */ export default { content:['./index.html','./src/**/*.{ts,tsx}'], theme:{extend:{fontFamily:{sans:['Inter','ui-sans-serif','system-ui'],serif:['Georgia','serif']},colors:{ink:'#171717',paper:'#ffffff',sand:'#fff7ef',brass:'#ff7a00',orange:'#ff7a00'}}}, plugins:[] };

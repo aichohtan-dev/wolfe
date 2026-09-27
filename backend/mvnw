@@ -1,0 +1,20 @@
+#!/bin/sh
+set -eu
+BASE_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+MVN_VERSION=3.9.11
+CACHE_DIR="${HOME}/.m2/wrapper/dists/apache-maven-${MVN_VERSION}"
+MVN_HOME="${CACHE_DIR}/apache-maven-${MVN_VERSION}"
+if [ ! -x "${MVN_HOME}/bin/mvn" ]; then
+  mkdir -p "${CACHE_DIR}"
+  ARCHIVE="${CACHE_DIR}/apache-maven-${MVN_VERSION}-bin.zip"
+  if [ ! -f "${ARCHIVE}" ]; then
+    command -v curl >/dev/null 2>&1 || { echo 'curl is required to bootstrap Maven.' >&2; exit 1; }
+    echo "Downloading Apache Maven ${MVN_VERSION}..." >&2
+    curl -fL --retry 3 -o "${ARCHIVE}.tmp" "https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/${MVN_VERSION}/apache-maven-${MVN_VERSION}-bin.zip"
+    mv "${ARCHIVE}.tmp" "${ARCHIVE}"
+  fi
+  command -v unzip >/dev/null 2>&1 || { echo 'unzip is required to bootstrap Maven.' >&2; exit 1; }
+  rm -rf "${MVN_HOME}"
+  unzip -q "${ARCHIVE}" -d "${CACHE_DIR}"
+fi
+exec "${MVN_HOME}/bin/mvn" -f "${BASE_DIR}/pom.xml" "$@"

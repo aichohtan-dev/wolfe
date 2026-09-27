@@ -1,0 +1,34 @@
+server:
+  port: ${PORT:8080}
+  forward-headers-strategy: framework
+spring:
+  application:
+    name: wolfe-api
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/wolfe}
+    username: ${DATABASE_USERNAME:wolfe}
+    password: ${DATABASE_PASSWORD:}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+  data:
+    redis:
+      url: ${REDIS_URL:redis://localhost:6379}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+springdoc:
+  api-docs:
+    enabled: ${WOLFE_OPENAPI_ENABLED:false}
+  swagger-ui:
+    enabled: ${WOLFE_OPENAPI_ENABLED:false}
+    path: /swagger-ui.html

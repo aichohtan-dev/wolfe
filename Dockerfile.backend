@@ -1,0 +1,15 @@
+FROM eclipse-temurin:21-jdk-alpine AS build
+WORKDIR /app
+COPY backend/.mvn .mvn
+COPY backend/mvnw backend/mvnw.cmd backend/pom.xml ./
+COPY backend/src src
+RUN chmod +x mvnw && ./mvnw -q -DskipTests package
+
+FROM eclipse-temurin:21-jre-alpine
+WORKDIR /app
+RUN addgroup -S wolfe && adduser -S wolfe -G wolfe
+COPY --from=build /app/target/wolfe-api-0.1.0.jar app.jar
+USER wolfe
+EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=5s --retries=3 CMD wget -qO- http://127.0.0.1:8080/actuator/health >/dev/null || exit 1
+ENTRYPOINT ["java","-jar","/app/app.jar"]

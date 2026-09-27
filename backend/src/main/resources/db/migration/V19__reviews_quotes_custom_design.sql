@@ -1,0 +1,6 @@
+CREATE TABLE product_reviews (id BIGSERIAL PRIMARY KEY, product_id BIGINT NOT NULL REFERENCES products(id), customer_id BIGINT NOT NULL REFERENCES customers(id), rating INTEGER NOT NULL CHECK (rating BETWEEN 1 AND 5), review VARCHAR(1000) NOT NULL, status VARCHAR(20) NOT NULL DEFAULT 'PENDING', created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP, CONSTRAINT uk_review_customer_product UNIQUE(customer_id,product_id));
+CREATE INDEX idx_product_reviews_product_status ON product_reviews(product_id,status,created_at DESC);
+CREATE TABLE quote_requests (id BIGSERIAL PRIMARY KEY, customer_id BIGINT NOT NULL REFERENCES customers(id), product_id BIGINT REFERENCES products(id), message VARCHAR(1000) NOT NULL, status VARCHAR(20) NOT NULL DEFAULT 'NEW', created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP);
+CREATE INDEX idx_quote_requests_customer_created ON quote_requests(customer_id,created_at DESC);
+CREATE TABLE custom_design_requests (id BIGSERIAL PRIMARY KEY, customer_id BIGINT NOT NULL REFERENCES customers(id), project_name VARCHAR(160) NOT NULL, requirements VARCHAR(2000), reference_image_url VARCHAR(2000), status VARCHAR(20) NOT NULL DEFAULT 'NEW', created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP);
+CREATE INDEX idx_custom_design_customer_created ON custom_design_requests(customer_id,created_at DESC);
