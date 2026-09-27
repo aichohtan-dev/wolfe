@@ -1,6 +1,14 @@
 node_modules
 dist
+target/
+**/target/
+*.class
 .env
 .env.*
 !.env.example
 .DS_Store
+.idea/
+.vscode/
+*.log
+*.tmp
+
