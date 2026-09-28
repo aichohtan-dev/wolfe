@@ -8,8 +8,14 @@ import java.time.OffsetDateTime;
 @Table(name = "inventory")
 public class Inventory {
     @Id
+    @Column(name = "product_id")
+    private Long productId;
+
     @OneToOne
-    @JoinColumn(name = "product_id") private Product product;
+    @MapsId
+    @JoinColumn(name = "product_id")
+    private Product product;
+
     @Column(nullable = false) private int quantity;
     @Column(nullable = false) private int reserved;
     @Column(name = "updated_at", nullable = false) private OffsetDateTime updatedAt;
@@ -17,9 +23,13 @@ public class Inventory {
     }
     public Inventory(Product product, int quantity) {
         this.product = product;
+        this.productId = product != null ? product.getId() : null;
         this.quantity = quantity;
         this.reserved = 0;
         this.updatedAt = OffsetDateTime.now();
+    }
+    public Long getProductId() {
+        return productId != null ? productId : (product != null ? product.getId() : null);
     }
     public Product getProduct() {
         return product;

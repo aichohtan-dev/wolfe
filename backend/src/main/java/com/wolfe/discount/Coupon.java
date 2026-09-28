@@ -17,7 +17,7 @@ import java.time.Instant;
     @Column(nullable = false) private boolean active;
     @Column(name = "starts_at") private Instant startsAt;
     @Column(name = "expires_at") private Instant expiresAt;
-    protected Coupon() {
+    public Coupon() {
     }
     public Long getId() {
         return id;

@@ -17,6 +17,29 @@ jobs:
       - run: npm run build
   backend:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: wolfe
+          POSTGRES_USER: wolfe
+          POSTGRES_PASSWORD: wolfe
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -26,3 +49,10 @@ jobs:
           cache: maven
       - run: chmod +x backend/mvnw
       - run: backend/mvnw -q test
+        env:
+          DATABASE_URL: jdbc:postgresql://localhost:5432/wolfe
+          DATABASE_USERNAME: wolfe
+          DATABASE_PASSWORD: wolfe
+          REDIS_URL: redis://localhost:6379
+          WOLFE_JWT_SECRET: super-secret-jwt-signing-key-for-wolfe-ci-verification-2026
+          WOLFE_FRONTEND_ORIGIN: http://localhost:5173

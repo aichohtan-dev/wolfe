@@ -23,7 +23,7 @@ public class CartController {
     @RequestParam(defaultValue = "1") int quantity,
     Authentication auth) {
         requireCustomer(auth, customerId);
-        Long productId = products.findBySlug(slug).filter(com.wolfe.catalog.Product::isActive).orElseThrow(() -> new IllegalArgumentException("product not found or inactive")).getId();
+        Long productId = products.findBySlugIgnoreCase(slug.trim()).filter(com.wolfe.catalog.Product::isActive).orElseThrow(() -> new IllegalArgumentException("product not found or inactive")).getId();
         if (quantity<1) throw new IllegalArgumentException("quantity must be positive");
         var item = repo.findById(new CartItem.Key(customerId, productId)).orElse(new CartItem(customerId, productId, quantity));
         item.setQuantity(quantity);
@@ -33,7 +33,7 @@ public class CartController {
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void remove(@PathVariable Long customerId, @PathVariable String slug, Authentication auth) {
         requireCustomer(auth, customerId);
-        Long productId = products.findBySlug(slug).filter(com.wolfe.catalog.Product::isActive).orElseThrow(() -> new IllegalArgumentException("product not found or inactive")).getId();
+        Long productId = products.findBySlugIgnoreCase(slug.trim()).filter(com.wolfe.catalog.Product::isActive).orElseThrow(() -> new IllegalArgumentException("product not found or inactive")).getId();
         repo.deleteById(new CartItem.Key(customerId, productId));
     }
 }

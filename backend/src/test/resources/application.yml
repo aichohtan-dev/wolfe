@@ -1,0 +1,30 @@
+server:
+  port: 8080
+spring:
+  application:
+    name: wolfe-api-test
+  datasource:
+    url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/wolfe}
+    username: ${DATABASE_USERNAME:wolfe}
+    password: ${DATABASE_PASSWORD:wolfe}
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  flyway:
+    enabled: true
+  data:
+    redis:
+      url: ${REDIS_URL:redis://localhost:6379}
+WOLFE_JWT_SECRET: "test-jwt-secret-key-that-is-at-least-32-chars-long-12345"
+WOLFE_JWT_TTL_SECONDS: 900
+WOLFE_FRONTEND_ORIGIN: "http://localhost:5173"
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

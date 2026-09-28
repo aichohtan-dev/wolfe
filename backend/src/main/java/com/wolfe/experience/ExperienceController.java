@@ -35,6 +35,9 @@ public class ExperienceController {
         this.recovery = recovery;
         this.accessories = accessories;
     }
+    private Product product(String slug) {
+        return products.findBySlug(slug).orElseThrow(() -> new NoSuchElementException("Product not found"));
+    }
     @GetMapping("/products/{slug}/spin") public List<ProductSpinFrame> spin(@PathVariable String slug) {
         return spins.findByProductIdOrderBySortOrderAsc(product(slug).getId());
     }

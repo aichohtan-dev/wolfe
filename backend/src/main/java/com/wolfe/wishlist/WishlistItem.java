@@ -32,5 +32,15 @@ public class WishlistItem {
             customerId = c;
             productId = p;
         }
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) return true;
+            if (!(o instanceof Key k)) return false;
+            return java.util.Objects.equals(customerId, k.customerId) && java.util.Objects.equals(productId, k.productId);
+        }
+        @Override
+        public int hashCode() {
+            return java.util.Objects.hash(customerId, productId);
+        }
     }
 }

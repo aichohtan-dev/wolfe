@@ -12,3 +12,6 @@ CREATE TABLE coupons (
  expires_at TIMESTAMPTZ
 );
 CREATE INDEX idx_coupons_active_code ON coupons(code, active);
+
+ALTER TABLE orders ADD COLUMN discount_amount BIGINT NOT NULL DEFAULT 0;
+ALTER TABLE orders ADD COLUMN coupon_code VARCHAR(40);

@@ -17,15 +17,29 @@ public class ProductSeed {
     };
 
     @Bean
-    CommandLineRunner seed(ProductRepository repo) {
+    CommandLineRunner seed(ProductRepository repo, com.wolfe.inventory.InventoryRepository inventoryRepo) {
         return args -> {
-            if (repo.count() != 0) return;
             for (int i = 0; i < PRODUCTS.length; i++) {
                 SeedProduct seed = PRODUCTS[i];
-                Product product = repo.save(new Product(seed.slug(), seed.name(), new BigDecimal(seed.price()), seed.category(), seed.finish(), seed.description()));
-                product.setImageUrl("/catalog/brass-0" + (i + 1) + ".jpg");
-                repo.save(product);
+                Product product = repo.findBySlug(seed.slug()).orElseGet(() -> {
+                    Product p = repo.save(new Product(seed.slug(), seed.name(), new BigDecimal(seed.price()), seed.category(), seed.finish(), seed.description()));
+                    p.setImageUrl("/catalog/brass-0" + (index1(seed.slug())) + ".jpg");
+                    return repo.save(p);
+                });
+                inventoryRepo.insertDefault(product.getId(), 50);
             }
+        };
+    }
+
+    private static String index1(String slug) {
+        return switch (slug) {
+            case "w-01" -> "1";
+            case "w-02" -> "2";
+            case "w-03" -> "3";
+            case "w-04" -> "4";
+            case "w-05" -> "5";
+            case "w-06" -> "6";
+            default -> "1";
         };
     }
 

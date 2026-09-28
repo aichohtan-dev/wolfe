@@ -21,5 +21,8 @@
     "postcss": "8.5.3",
     "autoprefixer": "10.4.21"
   },
-  "devDependencies": {}
+  "devDependencies": {
+    "@types/react": "18.3.18",
+    "@types/react-dom": "18.3.5"
+  }
 }

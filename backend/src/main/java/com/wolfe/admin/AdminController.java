@@ -81,15 +81,26 @@ public class AdminController {
         var allOrders = orders.findAll();
         long revenue = allOrders.stream().filter(o -> !"CANCELLED".equals(o.getStatus())).mapToLong(Order::getTotal).sum();
         long low = inventory.findAll().stream().filter(i -> i.getAvailable() <= 5).count();
-        return Map.of("products", products.count(), "activeProducts", products.findAll().stream().filter(Product::isActive).count(), "orders", allOrders.size(),
-        "customers", customers.count(), "inventoryItems", inventory.count(), "lowStock", low, "reviews", reviews.count(), "pendingReviews",
-        reviews.findAll().stream().filter(r -> "PENDING".equals(r.getStatus())).count(), "quotes", quotes.count(), "openQuotes",
-        quotes.findAll().stream().filter(q -> !"CLOSED".equals(q.getStatus())).count(), "customDesigns", customDesigns.count(), "openCustomDesigns",
-        customDesigns.findAll().stream().filter(q -> !Set.of("COMPLETED", "CLOSED").contains(q.getStatus())).count(), "returns",
-        returnRequests.count(), "revenue", revenue, "confirmed", allOrders.stream().filter(o -> "CONFIRMED".equals(o.getStatus())).count(),
-        "processing", allOrders.stream().filter(o -> "PROCESSING".equals(o.getStatus())).count(), "shipped",
-        allOrders.stream().filter(o -> "SHIPPED".equals(o.getStatus())).count(), "delivered",
-        allOrders.stream().filter(o -> "DELIVERED".equals(o.getStatus())).count());
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("products", products.count());
+        map.put("activeProducts", products.findAll().stream().filter(Product::isActive).count());
+        map.put("orders", (long) allOrders.size());
+        map.put("customers", customers.count());
+        map.put("inventoryItems", inventory.count());
+        map.put("lowStock", low);
+        map.put("reviews", reviews.count());
+        map.put("pendingReviews", reviews.findAll().stream().filter(r -> "PENDING".equals(r.getStatus())).count());
+        map.put("quotes", quotes.count());
+        map.put("openQuotes", quotes.findAll().stream().filter(q -> !"CLOSED".equals(q.getStatus())).count());
+        map.put("customDesigns", customDesigns.count());
+        map.put("openCustomDesigns", customDesigns.findAll().stream().filter(q -> !Set.of("COMPLETED", "CLOSED").contains(q.getStatus())).count());
+        map.put("returns", returnRequests.count());
+        map.put("revenue", revenue);
+        map.put("confirmed", allOrders.stream().filter(o -> "CONFIRMED".equals(o.getStatus())).count());
+        map.put("processing", allOrders.stream().filter(o -> "PROCESSING".equals(o.getStatus())).count());
+        map.put("shipped", allOrders.stream().filter(o -> "SHIPPED".equals(o.getStatus())).count());
+        map.put("delivered", allOrders.stream().filter(o -> "DELIVERED".equals(o.getStatus())).count());
+        return map;
     }
     public record CouponRequest(@NotBlank String code, @NotBlank String discountType, @Positive long value, @Min(0) long minimumSubtotal,
     @Min(0) long maximumDiscount, @Min(1) Integer usageLimit, Boolean active, java.time.Instant startsAt,
@@ -190,7 +201,7 @@ public class AdminController {
         p.setFeatured(r.featured() != null && r.featured());
         p.setSortOrder(r.sortOrder() == null?0:r.sortOrder());
         p = products.save(p);
-        inventory.save(new Inventory(p, 0));
+        inventory.insertDefault(p.getId(), 0);
         return p;
     }
     @PutMapping("/products/{id}") public Product updateProduct(@PathVariable Long id, @Valid @RequestBody ProductRequest r) {
@@ -361,7 +372,10 @@ public class AdminController {
     }
     @PutMapping("/inventory/{productId}") public InventoryView updateStock(@PathVariable Long productId, @Valid @RequestBody StockRequest r) {
         var p = products.findById(productId).orElseThrow(() -> new NoSuchElementException("Product not found"));
-        var i = inventory.findByProductId(productId).orElseGet(() -> inventory.save(new Inventory(p, 0)));
+        var i = inventory.findByProductId(productId).orElseGet(() -> {
+            inventory.insertDefault(p.getId(), 0);
+            return inventory.findByProductId(productId).orElseThrow();
+        });
         int before = i.getAvailable();
         i.setQuantity(r.quantity());
         i = inventory.save(i);
