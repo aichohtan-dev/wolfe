@@ -6,4 +6,8 @@ Disallow: /checkout
 Disallow: /orders
 Disallow: /profile
 Disallow: /addresses
+Disallow: /notifications
+Disallow: /wishlist
+Disallow: /compare
+Disallow: /config/
 Sitemap: /sitemap.xml

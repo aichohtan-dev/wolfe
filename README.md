@@ -93,20 +93,49 @@ Wolfe is a production-oriented commerce foundation with the following implemente
 
 Source/configuration checks pass, but this archive cannot claim a fully green dependency-backed build until dependencies are installed in an internet-enabled environment. The archive intentionally excludes `node_modules`. A generated `package-lock.json` should be committed after `npm install` on a network-enabled machine if strict `npm ci` reproducibility is required.
 
-### Local setup
+### Operator Quickstart & Launch Setup
 
-1. Copy `.env.example` to `.env` and set non-default credentials.
-2. Run `npm install`.
-3. Run `npm run typecheck` and `npm run build`.
-4. Start PostgreSQL/Redis with `docker compose up -d`.
-5. Run the API with `cd backend && ./mvnw test`.
+#### 1. Prerequisites
+- Node.js 20+ & npm
+- OpenJDK 21 & Maven (or `./mvnw`)
+- Docker & Docker Compose (optional for containerized setup)
 
-The current release is not declared payment-complete because Razorpay remains intentionally pending.
+#### 2. Environment Configuration
+Copy `.env.example` to `.env`:
+```bash
+cp .env.example .env
+```
+Ensure the following variables are configured in `.env`:
+- `POSTGRES_PASSWORD`: Secret database password
+- `WOLFE_JWT_SECRET`: Random string with minimum 32 characters
+- `WOLFE_FRONTEND_ORIGIN`: Base frontend URL (e.g. `http://localhost` for local Docker or `https://wolfe.example.com` for production)
+- `VITE_API_URL`: `/api/v1` (defaults to same-origin relative path)
 
-## V18.11 Admin Panel Completion
+#### 3. Local Development
+```bash
+# Terminal 1 - Frontend
+npm install
+npm run dev
 
-Admin operations now include product management, persistent categories and collections, product media management, variants, review moderation, quote/custom-design workflows, order/status history, customer directory, inventory/stock alerts, dashboard KPIs and bulk product operations. See `V18_11_CHANGELOG.md`.
+# Terminal 2 - Backend
+cd backend
+./mvnw spring-boot:run
+```
 
+#### 4. Production Docker Deployment
+```bash
+docker compose up -d --build
+```
+- Frontend & Reverse Proxy: `http://localhost:80` (or configured host port)
+- API Proxy: Routed internally via Nginx `/api/` -> `api:8080`
+- TLS Termination: Terminated upstream at your cloud load balancer or edge reverse proxy
 
-## V18.28 security hardening
-Authentication login/registration is Redis-rate-limited (5 attempts per 15 minutes per normalized email and client IP). Production OpenAPI/Swagger is disabled by default via `WOLFE_OPENAPI_ENABLED=false`.
+#### 5. Health Checks & Verification
+- Backend Health: `GET http://localhost:8080/actuator/health` or `GET /api/v1/products`
+- Frontend Status: `GET http://localhost/`
+- Database Migrations: Flyway executes automatically on Spring Boot application startup (checking schema versions in PostgreSQL).
+
+#### 6. Static Asset & Security Validation
+- `npm run typecheck`: Validates TypeScript types across storefront
+- `npm run build`: Generates optimized Vite production bundle
+- `git diff --check`: Verifies no trailing whitespace or git conflicts

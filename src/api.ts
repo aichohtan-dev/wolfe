@@ -133,6 +133,7 @@ export const api = {
     }) => request<any>('/orders', { method: 'POST', body: JSON.stringify(body) }),
     orderDetail: (id: string) => request<any>(`/orders/${encodeURIComponent(id)}`),
     orderHistory: (id: string) => request<any[]>(`/orders/${encodeURIComponent(id)}/history`),
+    customerOrders: (id: number) => request<any[]>(`/orders/customer/${id}`),
     cancelOrder: (id: string) => request<any>(`/orders/${encodeURIComponent(id)}/cancel`, { method: 'POST' }),
     addresses: { get: (id: number) => request<any[]>(`/customers/${id}/addresses`), create: (id: number, body: any) => request<any>(`/customers/${id}/addresses`, { method: 'POST', body: JSON.stringify(body) }), update: (id: number, addressId: number, body: any) => request<any>(`/customers/${id}/addresses/${addressId}`, { method: 'PUT', body: JSON.stringify(body) }), remove: (id: number, addressId: number) => request<void>(`/customers/${id}/addresses/${addressId}`, { method: 'DELETE' }) },
     returns: { get: (id: number) => request<any[]>(`/customers/${id}/returns`), create: (id: number, orderId: string, reason: string) => request<any>(`/customers/${id}/returns/${encodeURIComponent(orderId)}`, { method: 'POST', body: JSON.stringify({ reason }) }) },

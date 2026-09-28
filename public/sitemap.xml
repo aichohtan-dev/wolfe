@@ -2,9 +2,12 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>/</loc></url>
   <url><loc>/shop</loc></url>
+  <url><loc>/bundles</loc></url>
   <url><loc>/catalogue</loc></url>
   <url><loc>/consultation</loc></url>
   <url><loc>/quote</loc></url>
   <url><loc>/custom-design</loc></url>
   <url><loc>/journal</loc></url>
+  <url><loc>/privacy-policy</loc></url>
+  <url><loc>/terms</loc></url>
 </urlset>
