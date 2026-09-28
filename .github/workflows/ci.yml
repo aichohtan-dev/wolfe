@@ -12,7 +12,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: npm install --no-audit --no-fund --ignore-scripts
+      - run: npm ci --ignore-scripts
       - run: npm run typecheck
       - run: npm run build
   backend:
@@ -54,5 +54,4 @@ jobs:
           DATABASE_USERNAME: wolfe
           DATABASE_PASSWORD: wolfe
           REDIS_URL: redis://localhost:6379
-          WOLFE_JWT_SECRET: super-secret-jwt-signing-key-for-wolfe-ci-verification-2026
           WOLFE_FRONTEND_ORIGIN: http://localhost:5173
