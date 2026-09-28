@@ -9,11 +9,23 @@ jobs:
   docker-verify:
     runs-on: ubuntu-latest
     env:
-      POSTGRES_PASSWORD: ci_test_postgres_password_1234
-      WOLFE_JWT_SECRET: ci_test_jwt_secret_key_minimum_32_chars_long_12345
       WOLFE_FRONTEND_ORIGIN: http://localhost
     steps:
       - uses: actions/checkout@v4
+
+      - name: Generate ephemeral CI credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf 'POSTGRES_PASSWORD=%s\n' "$(openssl rand -hex 24)" >> "$GITHUB_ENV"
+          printf 'WOLFE_JWT_SECRET=%s\n' "$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+
+      - name: Verify no static CI credentials remain
+        run: |
+          if git grep -nE 'ci_test_|super-secret-jwt-signing-key' -- ':!.github/workflows/docker-verify.yml'; then
+            echo "Static CI credential material found in workflow files."
+            exit 1
+          fi
 
       - name: Verify Docker CLI and Compose
         run: |
@@ -21,7 +33,7 @@ jobs:
           docker compose version
 
       - name: Validate Docker Compose Configuration
-        run: docker compose config
+        run: docker compose config --quiet
 
       - name: Build Docker Stack
         run: docker compose build --no-cache
@@ -39,6 +51,11 @@ jobs:
             fi
             echo "Waiting for API... ($i/60)"
             sleep 2
+            if [ "$i" -eq 60 ]; then
+              echo "API did not become healthy within the timeout."
+              docker compose ps
+              exit 1
+            fi
           done
 
       - name: Verify Endpoints and Reverse Proxy
