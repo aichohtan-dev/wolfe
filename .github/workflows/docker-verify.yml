@@ -1,0 +1,71 @@
+name: Docker Verification
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  docker-verify:
+    runs-on: ubuntu-latest
+    env:
+      POSTGRES_PASSWORD: ci_test_postgres_password_1234
+      WOLFE_JWT_SECRET: ci_test_jwt_secret_key_minimum_32_chars_long_12345
+      WOLFE_FRONTEND_ORIGIN: http://localhost
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify Docker CLI and Compose
+        run: |
+          docker --version
+          docker compose version
+
+      - name: Validate Docker Compose Configuration
+        run: docker compose config
+
+      - name: Build Docker Stack
+        run: docker compose build --no-cache
+
+      - name: Start Docker Stack
+        run: docker compose up -d
+
+      - name: Wait for PostgreSQL and API to be Healthy
+        run: |
+          echo "Waiting for services to become ready..."
+          for i in {1..60}; do
+            if docker compose exec -T api wget -qO- http://localhost:8080/actuator/health | grep -q '"status":"UP"'; then
+              echo "API is UP!"
+              break
+            fi
+            echo "Waiting for API... ($i/60)"
+            sleep 2
+          done
+
+      - name: Verify Endpoints and Reverse Proxy
+        run: |
+          echo "Checking docker compose ps:"
+          docker compose ps
+
+          echo "Checking frontend on port 80:"
+          curl -f -s -o /dev/null -w "%{http_code}\n" http://localhost/
+
+          echo "Checking /actuator/health:"
+          docker compose exec -T api wget -qO- http://localhost:8080/actuator/health
+
+          echo "Checking /actuator/health/liveness:"
+          docker compose exec -T api wget -qO- http://localhost:8080/actuator/health/liveness
+
+          echo "Checking /actuator/health/readiness:"
+          docker compose exec -T api wget -qO- http://localhost:8080/actuator/health/readiness
+
+          echo "Checking /api/v1/products reverse proxy via nginx:"
+          curl -f -s http://localhost/api/v1/products
+
+      - name: Collect Docker Logs on Failure
+        if: failure()
+        run: |
+          docker compose logs
+
+      - name: Cleanup Docker Stack
+        if: always()
+        run: docker compose down -v
