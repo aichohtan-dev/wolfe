@@ -32,6 +32,7 @@ import Shop from './pages/Shop';
 import ProductPage from './pages/ProductPage';
 import Checkout from './pages/Checkout';
 import Admin from './pages/admin/Admin';
+import RetailerPortal from './pages/retailer/RetailerPortal';
 import { ProductCard } from './components/commerce/ProductCard';
 
 export function ProductGrid({ items, onAdd, onWish, wishes, onCompare = () => { }, compared = [] }: {
@@ -291,6 +292,7 @@ function App() {
                 <Route path="/journal" element={<SimpleContent eyebrow="Journal" title="Ideas for considered spaces." copy="A growing editorial space for materials, rooms, finishes and the small details that make a home feel like yours." />} />
                 <Route path="/privacy-policy" element={<PrivacyPolicy />} />
                 <Route path="/terms" element={<Terms />} />
+                <Route path="/retailer" element={<RetailerPortal />} />
                 <Route path="/admin" element={<Admin />} />
                 <Route path="*" element={<NotFound />} />
             </Routes>

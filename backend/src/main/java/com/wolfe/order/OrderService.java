@@ -33,6 +33,7 @@ public class OrderService {
     private final com.wolfe.experience.ConfigurationRepository configurations;
     private final BundleRepository bundles;
     private final BundleItemRepository bundleItems;
+    private final com.wolfe.retailer.RetailerAllocationService retailerAllocationService;
 
     private static final long FREE_SHIPPING_THRESHOLD = 250000; // ₹2,500 in paise
     private static final long STANDARD_SHIPPING_FEE = 19900; // ₹199 in paise
@@ -43,6 +44,17 @@ public class OrderService {
                         OrderStatusHistoryRepository history, com.wolfe.notification.NotificationService notifications,
                         com.wolfe.experience.ConfigurationRepository configurations, BundleRepository bundles,
                         BundleItemRepository bundleItems) {
+        this(orders, items, products, variants, inventory, couponService, coupons, history, notifications, configurations, bundles, bundleItems, null);
+    }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    public OrderService(OrderRepository orders, OrderItemRepository items, ProductRepository products,
+                        ProductVariantRepository variants, InventoryRepository inventory,
+                        CouponService couponService, CouponRepository coupons,
+                        OrderStatusHistoryRepository history, com.wolfe.notification.NotificationService notifications,
+                        com.wolfe.experience.ConfigurationRepository configurations, BundleRepository bundles,
+                        BundleItemRepository bundleItems,
+                        com.wolfe.retailer.RetailerAllocationService retailerAllocationService) {
         this.orders = orders;
         this.items = items;
         this.products = products;
@@ -55,6 +67,7 @@ public class OrderService {
         this.configurations = configurations;
         this.bundles = bundles;
         this.bundleItems = bundleItems;
+        this.retailerAllocationService = retailerAllocationService;
     }
 
     public long couponDiscount(String code, long subtotal) {
@@ -238,6 +251,13 @@ public class OrderService {
             ));
         }
 
+        if (retailerAllocationService != null) {
+            try {
+                List<OrderItem> savedItems = items.findByOrderId(order.getId());
+                retailerAllocationService.allocateOrder(order, savedItems);
+            } catch (Exception ignored) {}
+        }
+
         return order;
     }
 
@@ -252,10 +272,20 @@ public class OrderService {
         for (OrderItem item : orderItems) {
             Inventory stock = inventory.findByProductIdForUpdate(item.getProductId())
                     .orElseThrow(() -> new IllegalArgumentException("inventory missing for product " + item.getProductId()));
-            if ("CANCELLED".equals(next)) stock.release(item.getQuantity());
-            else if ("DELIVERED".equals(next)) stock.fulfill(item.getQuantity());
+            if ("CANCELLED".equals(next)) {
+                stock.release(item.getQuantity());
+            } else if ("DELIVERED".equals(next)) {
+                stock.fulfill(item.getQuantity());
+            }
             inventory.save(stock);
         }
+
+        if ("CANCELLED".equals(next) && retailerAllocationService != null) {
+            try {
+                retailerAllocationService.cancelAllocation(id);
+            } catch (Exception ignored) {}
+        }
+
         order.setStatus(next);
         Order saved = orders.save(order);
         history.save(new OrderStatusHistory(saved.getId(), next, null));

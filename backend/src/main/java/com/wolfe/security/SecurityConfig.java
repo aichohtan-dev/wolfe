@@ -30,7 +30,9 @@ public class SecurityConfig {
             "/api/v1/reviews/product/**",
             "/actuator/health", "/actuator/health/**", "/swagger-ui/**", "/v3/api-docs/**"
         ).permitAll()
-        .requestMatchers("/api/v1/admin/**").hasRole("ADMIN").anyRequest().authenticated())
+        .requestMatchers("/api/v1/retailer/**").hasAnyRole("RETAILER", "ADMIN", "SUPER_ADMIN")
+        .requestMatchers("/api/v1/admin/**").hasAnyRole("ADMIN", "SUPER_ADMIN")
+        .anyRequest().authenticated())
         .addFilterBefore(jwt, UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }

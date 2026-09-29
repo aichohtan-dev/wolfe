@@ -11,6 +11,9 @@ export default function Admin() {
     | 'brands'
     | 'subcategories'
     | 'pdf-import'
+    | 'retailers'
+    | 'allocations'
+    | 'settlements'
     | 'bundles'
     | 'media'
     | 'inventory'
@@ -98,6 +101,31 @@ export default function Admin() {
   const [stockSubscriptions, setStockSubscriptions] = useState<any[]>([]);
   const [cartRecovery, setCartRecovery] = useState<any[]>([]);
 
+  // Retailer Network & Fulfillment state
+  const [adminRetailers, setAdminRetailers] = useState<any[]>([]);
+  const [selectedRetailerData, setSelectedRetailerData] = useState<any | null>(null);
+  const [retailerDraft, setRetailerDraft] = useState<any>({
+    name: '',
+    ownerName: '',
+    email: '',
+    phone: '',
+    address: '',
+    city: '',
+    state: 'Rajasthan',
+    pincode: '',
+    deliveryRadiusKm: 25.0,
+    commissionRate: 10.0,
+  });
+  const [serviceAreaDraft, setServiceAreaDraft] = useState<any>({ pincode: '', city: '', areaName: '', deliveryEtaHours: 24 });
+  const [retailerStockAdjust, setRetailerStockAdjust] = useState<any | null>(null);
+  const [adminMarginRules, setAdminMarginRules] = useState<any[]>([]);
+  const [marginDraft, setMarginDraft] = useState<any>({ category: 'Hardware', marginType: 'PERCENTAGE', marginValue: 10.0, priority: 1 });
+  const [adminSettlements, setAdminSettlements] = useState<any[]>([]);
+  const [evalOrderId, setEvalOrderId] = useState<string | null>(null);
+  const [evalData, setEvalData] = useState<any | null>(null);
+  const [manualAssignRetId, setManualAssignRetId] = useState<number | null>(null);
+  const [manualAssignNotes, setManualAssignNotes] = useState<string>('');
+
   const load = async () => {
     setLoading(true);
     setError('');
@@ -123,6 +151,9 @@ export default function Admin() {
         br,
         sc,
         pj,
+        rets,
+        margins,
+        settles,
       ] = await Promise.all([
         api.admin.dashboard(),
         api.admin.products(),
@@ -144,6 +175,9 @@ export default function Admin() {
         api.admin.brands().catch(() => []),
         api.admin.subcategories().catch(() => []),
         api.admin.pdfImports.list().catch(() => []),
+        api.admin.retailers.list(0, 50).catch(() => ({ content: [] })),
+        api.admin.marginRules.list().catch(() => []),
+        api.admin.settlements.list(0, 50).catch(() => ({ content: [] })),
       ]);
       setDashboard(d);
       setAdminProducts(p);
@@ -165,6 +199,9 @@ export default function Admin() {
       setBrands(br);
       setSubcategories(sc);
       setPdfJobs(pj);
+      setAdminRetailers((rets as any).content || []);
+      setAdminMarginRules(margins);
+      setAdminSettlements((settles as any).content || []);
       setSelected([]);
     } catch (e: any) {
       setError(e.message || 'Admin access required');
@@ -392,6 +429,9 @@ export default function Admin() {
             'brands',
             'subcategories',
             'pdf-import',
+            'retailers',
+            'allocations',
+            'settlements',
             'bundles',
             'media',
             'inventory',
@@ -1009,6 +1049,373 @@ export default function Admin() {
                   </div>
                 </div>
               )}
+            </div>
+          )}
+          {tab === 'retailers' && (
+            <div className="admin-overview-grid">
+              <div className="admin-panel">
+                <h2>Add fulfillment partner</h2>
+                <p className="admin-help">
+                  Register a local hardware / ply / laminate retailer to serve regional delivery pincodes.
+                </p>
+                <input
+                  className="field"
+                  value={retailerDraft.name}
+                  onChange={(e) => setRetailerDraft({ ...retailerDraft, name: e.target.value })}
+                  placeholder="Business / store name *"
+                />
+                <input
+                  className="field"
+                  value={retailerDraft.ownerName}
+                  onChange={(e) => setRetailerDraft({ ...retailerDraft, ownerName: e.target.value })}
+                  placeholder="Owner / contact name"
+                />
+                <input
+                  className="field"
+                  type="email"
+                  value={retailerDraft.email}
+                  onChange={(e) => setRetailerDraft({ ...retailerDraft, email: e.target.value })}
+                  placeholder="Email (unique login identifier) *"
+                />
+                <input
+                  className="field"
+                  value={retailerDraft.phone}
+                  onChange={(e) => setRetailerDraft({ ...retailerDraft, phone: e.target.value })}
+                  placeholder="Phone number *"
+                />
+                <input
+                  className="field"
+                  value={retailerDraft.address}
+                  onChange={(e) => setRetailerDraft({ ...retailerDraft, address: e.target.value })}
+                  placeholder="Store address *"
+                />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  <input
+                    className="field"
+                    value={retailerDraft.city}
+                    onChange={(e) => setRetailerDraft({ ...retailerDraft, city: e.target.value })}
+                    placeholder="City *"
+                  />
+                  <input
+                    className="field"
+                    value={retailerDraft.pincode}
+                    onChange={(e) => setRetailerDraft({ ...retailerDraft, pincode: e.target.value })}
+                    placeholder="Pincode *"
+                  />
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  <input
+                    className="field"
+                    type="number"
+                    value={retailerDraft.deliveryRadiusKm}
+                    onChange={(e) => setRetailerDraft({ ...retailerDraft, deliveryRadiusKm: Number(e.target.value) })}
+                    placeholder="Radius (km)"
+                  />
+                  <input
+                    className="field"
+                    type="number"
+                    value={retailerDraft.commissionRate}
+                    onChange={(e) => setRetailerDraft({ ...retailerDraft, commissionRate: Number(e.target.value) })}
+                    placeholder="Commission %"
+                  />
+                </div>
+                <button
+                  className="btn btn-orange"
+                  onClick={async () => {
+                    if (!retailerDraft.name || !retailerDraft.email || !retailerDraft.phone || !retailerDraft.address || !retailerDraft.city || !retailerDraft.pincode) {
+                      setError('Please complete all required retailer fields');
+                      return;
+                    }
+                    try {
+                      await api.admin.retailers.create(retailerDraft);
+                      setRetailerDraft({ name: '', ownerName: '', email: '', phone: '', address: '', city: '', state: 'Rajasthan', pincode: '', deliveryRadiusKm: 25.0, commissionRate: 10.0 });
+                      await load();
+                    } catch (err: any) {
+                      setError(err.message || 'Failed to create retailer');
+                    }
+                  }}
+                >
+                  Register Partner
+                </button>
+              </div>
+
+              <div className="admin-panel">
+                <h2>Fulfillment partner directory ({adminRetailers.length})</h2>
+                <div className="admin-list" style={{ maxHeight: 600, overflowY: 'auto' }}>
+                  {adminRetailers.map((r) => (
+                    <div key={r.id} style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 12, borderBottom: '1px solid #292524' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                        <div>
+                          <strong>{r.name}</strong>
+                          <span style={{ fontSize: 12, color: '#a8a29e', display: 'block' }}>
+                            {r.city} ({r.pincode}) · Radius: {r.deliveryRadiusKm}km · Margin: {r.commissionRate}%
+                          </span>
+                          <span style={{ fontSize: 11, color: '#78716c', fontFamily: 'monospace' }}>
+                            {r.email} · {r.phone}
+                          </span>
+                        </div>
+                        <div style={{ display: 'flex', gap: 6 }}>
+                          <select
+                            className="select-field"
+                            style={{ fontSize: 12, padding: '4px 8px' }}
+                            value={r.status}
+                            onChange={async (e) => {
+                              await api.admin.retailers.update(r.id, { status: e.target.value as any });
+                              await load();
+                            }}
+                          >
+                            <option value="ACTIVE">ACTIVE</option>
+                            <option value="PENDING">PENDING</option>
+                            <option value="SUSPENDED">SUSPENDED</option>
+                            <option value="INACTIVE">INACTIVE</option>
+                          </select>
+                          <button
+                            className="btn btn-light"
+                            style={{ padding: '4px 8px', fontSize: 12 }}
+                            onClick={async () => {
+                              const details = await api.admin.retailers.get(r.id);
+                              setSelectedRetailerData(details);
+                            }}
+                          >
+                            Manage
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  {!adminRetailers.length && <p className="empty-state">No retailer partners registered.</p>}
+                </div>
+              </div>
+
+              {selectedRetailerData && (
+                <div className="admin-panel" style={{ gridColumn: '1 / -1', marginTop: 16 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                    <h2>Partner Details: {selectedRetailerData.retailer.name}</h2>
+                    <button className="btn btn-light" onClick={() => setSelectedRetailerData(null)}>Close</button>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                    <div>
+                      <h3>Service areas ({selectedRetailerData.serviceAreas?.length || 0})</h3>
+                      <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+                        <input
+                          className="field"
+                          placeholder="Pincode"
+                          value={serviceAreaDraft.pincode}
+                          onChange={(e) => setServiceAreaDraft({ ...serviceAreaDraft, pincode: e.target.value })}
+                        />
+                        <input
+                          className="field"
+                          placeholder="City"
+                          value={serviceAreaDraft.city}
+                          onChange={(e) => setServiceAreaDraft({ ...serviceAreaDraft, city: e.target.value })}
+                        />
+                        <button
+                          className="btn btn-orange"
+                          onClick={async () => {
+                            if (!serviceAreaDraft.pincode || !serviceAreaDraft.city) return;
+                            await api.admin.retailers.addServiceArea(selectedRetailerData.retailer.id, serviceAreaDraft);
+                            setServiceAreaDraft({ pincode: '', city: '', areaName: '', deliveryEtaHours: 24 });
+                            const updated = await api.admin.retailers.get(selectedRetailerData.retailer.id);
+                            setSelectedRetailerData(updated);
+                          }}
+                        >
+                          Add Area
+                        </button>
+                      </div>
+                      <div className="admin-list" style={{ maxHeight: 200, overflowY: 'auto' }}>
+                        {selectedRetailerData.serviceAreas?.map((sa: any) => (
+                          <div key={sa.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 8px' }}>
+                            <span>{sa.pincode} - {sa.city} ({sa.deliveryEtaHours}h ETA)</span>
+                            <button
+                              className="btn btn-light"
+                              style={{ padding: '2px 6px', fontSize: 11 }}
+                              onClick={async () => {
+                                await api.admin.retailers.removeServiceArea(sa.id);
+                                const updated = await api.admin.retailers.get(selectedRetailerData.retailer.id);
+                                setSelectedRetailerData(updated);
+                              }}
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <h3>Low stock items ({selectedRetailerData.lowStockItems?.length || 0})</h3>
+                      <div className="admin-list" style={{ maxHeight: 240, overflowY: 'auto' }}>
+                        {selectedRetailerData.lowStockItems?.map((ls: any) => (
+                          <div key={ls.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 8px' }}>
+                            <span><strong>{ls.sku}</strong> (Avail: {ls.availableStock})</span>
+                            <button
+                              className="btn btn-light"
+                              style={{ padding: '2px 6px', fontSize: 11 }}
+                              onClick={() => setRetailerStockAdjust(ls)}
+                            >
+                              Adjust
+                            </button>
+                          </div>
+                        ))}
+                        {!selectedRetailerData.lowStockItems?.length && <p className="empty-state">No low stock items.</p>}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {tab === 'allocations' && (
+            <div className="admin-overview-grid">
+              <div className="admin-panel" style={{ gridColumn: '1 / -1' }}>
+                <h2>Order Allocation & Fulfillment Matrix</h2>
+                <p className="admin-help">
+                  Inspect regional orders, evaluate candidate fulfillment partners based on inventory and delivery radius, and assign/override fulfillment.
+                </p>
+
+                <div className="admin-list">
+                  {adminOrders.map((ord) => (
+                    <div key={ord.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 12 }}>
+                      <div>
+                        <strong>{ord.id}</strong> — <span style={{ color: '#fbbf24' }}>{money(ord.total / 100)}</span>
+                        <span style={{ fontSize: 12, color: '#a8a29e', display: 'block' }}>
+                          Customer: {ord.customerName} · {ord.city} ({ord.pincode}) · Status: {ord.status}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <button
+                          className="btn btn-orange"
+                          style={{ padding: '6px 12px', fontSize: 13 }}
+                          onClick={async () => {
+                            setEvalOrderId(ord.id);
+                            try {
+                              const res = await api.admin.allocations.eval(ord.id);
+                              setEvalData(res);
+                              if (res.candidates && res.candidates.length > 0) {
+                                setManualAssignRetId(res.candidates[0].retailer.id);
+                              }
+                            } catch (err: any) {
+                              setError(err.message);
+                            }
+                          }}
+                        >
+                          Evaluate & Assign
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  {!adminOrders.length && <p className="empty-state">No orders available.</p>}
+                </div>
+              </div>
+
+              {evalOrderId && evalData && (
+                <div className="admin-panel" style={{ gridColumn: '1 / -1', marginTop: 16 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                    <h2>Allocation Evaluation for Order {evalOrderId}</h2>
+                    <button className="btn btn-light" onClick={() => { setEvalOrderId(null); setEvalData(null); }}>Close</button>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 16 }}>
+                    <div style={{ background: '#1c1917', padding: 12, borderRadius: 8 }}>
+                      <h3 style={{ fontSize: 13, textTransform: 'uppercase', color: '#a8a29e', marginBottom: 8 }}>Customer Delivery Target</h3>
+                      <p style={{ fontSize: 13, color: '#f5f5f4' }}><strong>{evalData.order.customerName}</strong></p>
+                      <p style={{ fontSize: 12, color: '#a8a29e' }}>{evalData.order.address}</p>
+                      <p style={{ fontSize: 12, color: '#a8a29e' }}>{evalData.order.city} - {evalData.order.pincode}</p>
+                      <p style={{ fontSize: 12, color: '#d6d3d1', marginTop: 6 }}>Phone: {evalData.order.phone}</p>
+
+                      <h3 style={{ fontSize: 13, textTransform: 'uppercase', color: '#a8a29e', marginTop: 16, marginBottom: 8 }}>Order Items ({evalData.items?.length || 0})</h3>
+                      <ul style={{ fontSize: 12, color: '#d6d3d1', paddingLeft: 16 }}>
+                        {evalData.items?.map((it: any) => (
+                          <li key={it.id}>{it.productName} ({it.variantSku || 'BASE-SKU'}) x{it.quantity}</li>
+                        ))}
+                      </ul>
+                    </div>
+
+                    <div>
+                      <h3 style={{ fontSize: 13, textTransform: 'uppercase', color: '#a8a29e', marginBottom: 8 }}>Eligible Partner Candidates</h3>
+                      <div className="admin-list" style={{ maxHeight: 300, overflowY: 'auto' }}>
+                        {evalData.candidates?.map((c: any) => (
+                          <div key={c.retailer.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px' }}>
+                            <div>
+                              <strong>{c.retailer.name}</strong> ({c.retailer.city})
+                              <span style={{ fontSize: 12, color: '#a8a29e', display: 'block' }}>
+                                Serviceable: {c.serviceable ? '✅ Yes' : '❌ Out of area'} · Stock match: {c.matchingItemsCount}/{c.totalItemsCount} · ETA: {c.etaHours}h
+                              </span>
+                            </div>
+                            <button
+                              className="btn btn-light"
+                              style={{ padding: '4px 10px', fontSize: 12 }}
+                              onClick={async () => {
+                                try {
+                                  await api.admin.allocations.assign(evalOrderId, c.retailer.id, 'Admin manual partner assignment');
+                                  const updated = await api.admin.allocations.eval(evalOrderId);
+                                  setEvalData(updated);
+                                  await load();
+                                } catch (err: any) {
+                                  setError(err.message);
+                                }
+                              }}
+                            >
+                              Assign This Partner
+                            </button>
+                          </div>
+                        ))}
+                        {!evalData.candidates?.length && <p className="empty-state">No partner candidates found.</p>}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {tab === 'settlements' && (
+            <div className="admin-overview-grid">
+              <div className="admin-panel" style={{ gridColumn: '1 / -1' }}>
+                <h2>Partner Settlement Ledger</h2>
+                <p className="admin-help">
+                  Historical margin and payout calculations. Settlements become ELIGIBLE upon customer delivery confirmation.
+                </p>
+
+                <div className="admin-list">
+                  {adminSettlements.map((s) => (
+                    <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: 12 }}>
+                      <div>
+                        <strong>Order {s.orderId}</strong> · Partner #{s.retailerId}
+                        <span style={{ fontSize: 12, color: '#a8a29e', display: 'block' }}>
+                          Gross Total: {money(s.grossAmount / 100)} · Wolfe Margin: {money(s.wolfeMarginAmount / 100)} · <strong style={{ color: '#fbbf24' }}>Partner Payable: {money(s.retailerPayableAmount / 100)}</strong>
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                        <span className={`badge ${s.status === 'SETTLED' ? 'badge-green' : s.status === 'ELIGIBLE' ? 'badge-blue' : 'badge-yellow'}`}>
+                          {s.status}
+                        </span>
+                        {s.status !== 'SETTLED' && (
+                          <button
+                            className="btn btn-light"
+                            style={{ padding: '4px 10px', fontSize: 12 }}
+                            onClick={async () => {
+                              const ref = prompt('Enter bank / settlement reference transaction ID:', `TXN-WLF-${Date.now()}`);
+                              if (ref) {
+                                await api.admin.settlements.settle(s.id, ref);
+                                await load();
+                              }
+                            }}
+                          >
+                            Mark Settled
+                          </button>
+                        )}
+                        {s.status === 'SETTLED' && (
+                          <span style={{ fontSize: 11, color: '#78716c', fontFamily: 'monospace' }}>Ref: {s.referenceNumber}</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                  {!adminSettlements.length && <p className="empty-state">No settlement records found.</p>}
+                </div>
+              </div>
             </div>
           )}
           {tab === 'bundles' && (

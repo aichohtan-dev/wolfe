@@ -400,6 +400,209 @@ export const api = {
         hotspot: (id: number, body: any) => request<any>(`/admin/experience/visual/${id}/hotspots`, { method: 'POST', body: JSON.stringify(body) }),
         deleteHotspot: (id: number) => request<void>(`/admin/experience/hotspots/${id}`, { method: 'DELETE' }),
         stockSubscriptions: () => request<any[]>('/admin/experience/back-in-stock'),
-        cartRecovery: () => request<any[]>('/admin/experience/cart-recovery')
+        cartRecovery: () => request<any[]>('/admin/experience/cart-recovery'),
+        retailers: {
+            list: (page = 0, size = 20, query?: string, status?: string) =>
+                request<{ content: Retailer[]; totalElements: number; totalPages: number }>(
+                    `/admin/retailers?page=${page}&size=${size}${query ? `&query=${encodeURIComponent(query)}` : ''}${status ? `&status=${status}` : ''}`
+                ),
+            get: (id: number) => request<{ retailer: Retailer; serviceAreas: RetailerServiceArea[]; marginRules: RetailerMarginRule[]; lowStockItems: RetailerInventory[] }>(`/admin/retailers/${id}`),
+            create: (body: Partial<Retailer>) => request<Retailer>('/admin/retailers', { method: 'POST', body: JSON.stringify(body) }),
+            update: (id: number, body: Partial<Retailer>) => request<Retailer>(`/admin/retailers/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+            addServiceArea: (id: number, body: Partial<RetailerServiceArea>) => request<RetailerServiceArea>(`/admin/retailers/${id}/service-areas`, { method: 'POST', body: JSON.stringify(body) }),
+            removeServiceArea: (areaId: number) => request<void>(`/admin/retailers/service-areas/${areaId}`, { method: 'DELETE' }),
+            getInventory: (id: number, page = 0, size = 20, query?: string) =>
+                request<{ content: RetailerInventory[]; totalElements: number; totalPages: number }>(
+                    `/admin/retailers/${id}/inventory?page=${page}&size=${size}${query ? `&query=${encodeURIComponent(query)}` : ''}`
+                ),
+            adjustStock: (id: number, sku: string, newPhysicalStock: number, reason: string) =>
+                request<RetailerInventory>(`/admin/retailers/${id}/inventory/adjust`, { method: 'POST', body: JSON.stringify({ sku, newPhysicalStock, reason }) }),
+            auditLogs: (page = 0, size = 30) =>
+                request<{ content: RetailerAuditLog[]; totalElements: number }>(`/admin/retailers/audit-logs?page=${page}&size=${size}`)
+        },
+        allocations: {
+            eval: (orderId: string) => request<AllocationEvaluation>(`/admin/retailers/allocations/eval/${encodeURIComponent(orderId)}`),
+            assign: (orderId: string, retailerId: number, notes?: string) =>
+                request<any>(`/admin/retailers/allocations/${encodeURIComponent(orderId)}/assign`, { method: 'POST', body: JSON.stringify({ retailerId, notes }) })
+        },
+        marginRules: {
+            list: () => request<RetailerMarginRule[]>('/admin/retailers/margin-rules'),
+            create: (body: Partial<RetailerMarginRule>) => request<RetailerMarginRule>('/admin/retailers/margin-rules', { method: 'POST', body: JSON.stringify(body) }),
+            delete: (id: number) => request<void>(`/admin/retailers/margin-rules/${id}`, { method: 'DELETE' })
+        },
+        settlements: {
+            list: (page = 0, size = 20, retailerId?: number, status?: string) =>
+                request<{ content: RetailerSettlement[]; totalElements: number; totalPages: number }>(
+                    `/admin/retailers/settlements?page=${page}&size=${size}${retailerId ? `&retailerId=${retailerId}` : ''}${status ? `&status=${status}` : ''}`
+                ),
+            settle: (id: number, referenceNumber: string) =>
+                request<RetailerSettlement>(`/admin/retailers/settlements/${id}/settle`, { method: 'POST', body: JSON.stringify({ referenceNumber }) })
+        }
+    },
+    retailer: {
+        me: () => request<{ retailer: Retailer; stats: { lowStockCount: number; pendingOrdersCount: number; totalSettlements: number; totalEarningsPaise: number } }>('/retailer/me'),
+        orders: () => request<any[]>('/retailer/orders'),
+        accept: (orderId: string) => request<any>(`/retailer/orders/${encodeURIComponent(orderId)}/accept`, { method: 'POST' }),
+        pack: (orderId: string, trackingNumber?: string, courierName?: string) =>
+            request<any>(`/retailer/orders/${encodeURIComponent(orderId)}/pack`, { method: 'POST', body: JSON.stringify({ trackingNumber, courierName }) }),
+        ready: (orderId: string) => request<any>(`/retailer/orders/${encodeURIComponent(orderId)}/ready`, { method: 'POST' }),
+        outForDelivery: (orderId: string, trackingNumber?: string) =>
+            request<any>(`/retailer/orders/${encodeURIComponent(orderId)}/out-for-delivery`, { method: 'POST', body: JSON.stringify({ trackingNumber }) }),
+        deliver: (orderId: string) => request<any>(`/retailer/orders/${encodeURIComponent(orderId)}/deliver`, { method: 'POST' }),
+        reject: (orderId: string, reason: string) =>
+            request<any>(`/retailer/orders/${encodeURIComponent(orderId)}/reject`, { method: 'POST', body: JSON.stringify({ reason }) }),
+        inventory: (page = 0, size = 20, query?: string) =>
+            request<{ content: RetailerInventory[]; totalElements: number; totalPages: number }>(
+                `/retailer/inventory?page=${page}&size=${size}${query ? `&query=${encodeURIComponent(query)}` : ''}`
+            ),
+        adjustStock: (sku: string, newPhysicalStock: number, reason?: string) =>
+            request<RetailerInventory>('/retailer/inventory/adjust', { method: 'POST', body: JSON.stringify({ sku, newPhysicalStock, reason }) }),
+        movements: (page = 0, size = 25) =>
+            request<{ content: InventoryMovement[]; totalElements: number }>(`/retailer/inventory/movements?page=${page}&size=${size}`),
+        settlements: (page = 0, size = 20, status?: string) =>
+            request<{ content: RetailerSettlement[]; totalElements: number; totalPages: number }>(
+                `/retailer/settlements?page=${page}&size=${size}${status ? `&status=${status}` : ''}`
+            )
     }
+};
+
+export type Retailer = {
+    id: number;
+    name: string;
+    ownerName?: string;
+    email: string;
+    phone: string;
+    address: string;
+    city: string;
+    state: string;
+    pincode: string;
+    deliveryRadiusKm: number;
+    status: 'PENDING' | 'ACTIVE' | 'SUSPENDED' | 'INACTIVE';
+    verificationStatus: 'UNVERIFIED' | 'VERIFIED';
+    agreementStatus: 'PENDING' | 'SIGNED';
+    rating: number;
+    commissionRate: number;
+    userId?: number;
+    createdAt?: string;
+    updatedAt?: string;
+};
+
+export type RetailerServiceArea = {
+    id: number;
+    retailerId: number;
+    pincode: string;
+    city: string;
+    areaName?: string;
+    deliveryEtaHours: number;
+    active: boolean;
+};
+
+export type RetailerInventory = {
+    id: number;
+    retailerId: number;
+    productId: number;
+    variantId?: number;
+    sku: string;
+    physicalStock: number;
+    reservedStock: number;
+    availableStock: number;
+    lowStockThreshold: number;
+    updatedAt: string;
+};
+
+export type InventoryMovement = {
+    id: number;
+    retailerId: number;
+    productId: number;
+    variantId?: number;
+    sku: string;
+    previousQuantity: number;
+    quantityChanged: number;
+    newQuantity: number;
+    movementType: string;
+    orderId?: string;
+    createdBy?: string;
+    reason?: string;
+    createdAt: string;
+};
+
+export type RetailerOrderAssignment = {
+    id: number;
+    orderId: string;
+    retailerId: number;
+    status: 'ASSIGNED' | 'ACCEPTED' | 'REJECTED' | 'REASSIGNED' | 'COMPLETED' | 'CANCELLED';
+    assignedBy: string;
+    assignedAt: string;
+    acceptedAt?: string;
+    rejectedAt?: string;
+    rejectionReason?: string;
+    notes?: string;
+};
+
+export type Fulfillment = {
+    id: number;
+    orderId: string;
+    retailerId: number;
+    status: 'ASSIGNED' | 'ACCEPTED' | 'PACKED' | 'READY_FOR_DELIVERY' | 'OUT_FOR_DELIVERY' | 'DELIVERED' | 'CANCELLED' | 'FAILED_DELIVERY' | 'RETURNED';
+    trackingNumber?: string;
+    courierName?: string;
+    packedAt?: string;
+    shippedAt?: string;
+    deliveredAt?: string;
+    failedAt?: string;
+    failedReason?: string;
+    createdAt: string;
+    updatedAt: string;
+};
+
+export type RetailerMarginRule = {
+    id: number;
+    retailerId?: number;
+    category?: string;
+    productId?: number;
+    variantId?: number;
+    marginType: 'PERCENTAGE' | 'FIXED';
+    marginValue: number;
+    priority: number;
+    active: boolean;
+};
+
+export type RetailerSettlement = {
+    id: number;
+    orderId: string;
+    retailerId: number;
+    grossAmount: number;
+    wolfeMarginAmount: number;
+    retailerPayableAmount: number;
+    status: 'PENDING' | 'ELIGIBLE' | 'PROCESSING' | 'SETTLED' | 'HELD' | 'ADJUSTED';
+    referenceNumber?: string;
+    settledAt?: string;
+    notes?: string;
+    createdAt: string;
+    updatedAt: string;
+};
+
+export type RetailerAuditLog = {
+    id: number;
+    entityName: string;
+    entityId: string;
+    action: string;
+    actor: string;
+    details?: string;
+    createdAt: string;
+};
+
+export type AllocationEvaluation = {
+    order: any;
+    items: any[];
+    currentAssignment?: RetailerOrderAssignment;
+    fulfillment?: Fulfillment;
+    candidates: {
+        retailer: Retailer;
+        serviceable: boolean;
+        hasAllStock: boolean;
+        matchingItemsCount: number;
+        totalItemsCount: number;
+        etaHours: number;
+    }[];
 };
