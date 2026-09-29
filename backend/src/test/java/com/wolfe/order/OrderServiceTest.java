@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import com.wolfe.bundle.BundleItemRepository;
 import com.wolfe.bundle.BundleRepository;
 import com.wolfe.catalog.ProductRepository;
+import com.wolfe.catalog.ProductVariantRepository;
 import com.wolfe.discount.CouponRepository;
 import com.wolfe.discount.CouponService;
 import com.wolfe.experience.ConfigurationRepository;
@@ -23,6 +24,7 @@ class OrderServiceTest {
     @Mock OrderRepository orders;
     @Mock OrderItemRepository items;
     @Mock ProductRepository products;
+    @Mock ProductVariantRepository variants;
     @Mock InventoryRepository inventory;
     @Mock CouponService couponService;
     @Mock CouponRepository coupons;
@@ -40,6 +42,7 @@ class OrderServiceTest {
                 orders,
                 items,
                 products,
+                variants,
                 inventory,
                 couponService,
                 coupons,

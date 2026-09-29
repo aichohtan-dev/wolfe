@@ -17,8 +17,11 @@ public class SecurityConfig {
     @Bean SecurityFilterChain security(HttpSecurity http, JwtAuthFilter jwt) throws Exception {
         http.csrf(c -> c.disable()).headers(h -> h.contentSecurityPolicy(csp -> csp.policyDirectives("default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' http://localhost:5173 http://localhost:8080; font-src 'self' data:; frame-ancestors 'none'")).frameOptions(f -> f.deny()).referrerPolicy(r -> r.policy(org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))).cors(c -> c.configurationSource(cors())).sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .authorizeHttpRequests(a -> a.requestMatchers(
+            "/error",
             "/api/v1/customers/register", "/api/v1/customers/login", "/api/v1/customers/refresh", "/api/v1/customers/logout",
             "/api/v1/products", "/api/v1/products/**",
+            "/api/v1/brands", "/api/v1/brands/**",
+            "/api/v1/subcategories", "/api/v1/subcategories/**",
             "/api/v1/bundles", "/api/v1/bundles/**",
             "/api/v1/visual-content", "/api/v1/visual-content/**",
             "/api/v1/experience/products/**", "/api/v1/experience/visual/**",

@@ -1,6 +1,11 @@
 package com.wolfe.catalog;
 
+import java.math.BigDecimal;
 import java.util.*;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -8,55 +13,234 @@ import org.springframework.web.bind.annotation.*;
 public class ProductController {
     private final ProductRepository repository;
     private final ProductVariantRepository variants;
+
     public ProductController(ProductRepository repository, ProductVariantRepository variants) {
         this.repository = repository;
         this.variants = variants;
     }
-    @GetMapping public List<Product> list(@RequestParam(required = false) String category, @RequestParam(required = false) String q,
-    @RequestParam(required = false) String finish, @RequestParam(required = false) String material, @RequestParam(required = false) String color,
-    @RequestParam(required = false) String style, @RequestParam(required = false) Boolean featured,
-    @RequestParam(required = false) String sort) {
-        List<Product> rows = repository.searchActive(blankToNull(q), blankToNull(category), blankToNull(finish), blankToNull(material), blankToNull(color),
-        blankToNull(style));
-        if (featured != null && featured) rows = rows.stream().filter(Product::isFeatured).toList();
-        Comparator<Product> cmp = switch (sort == null?"featured":sort) {
-            case "price_asc" -> Comparator.comparing(Product::getPrice);
-            case "price_desc" -> Comparator.comparing(Product::getPrice).reversed();
-            case "name_asc" -> Comparator.comparing(Product::getName, String.CASE_INSENSITIVE_ORDER);
-            default -> Comparator.comparing(Product::isFeatured).reversed().thenComparing(Product::getSortOrder).thenComparing(Product::getName,
-            String.CASE_INSENSITIVE_ORDER);
-        }
-        ;
-        return rows.stream().sorted(cmp).toList();
+
+    @GetMapping
+    public List<Product> list(
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) String subcategory,
+            @RequestParam(required = false) String brand,
+            @RequestParam(required = false) Long brandId,
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) String finish,
+            @RequestParam(required = false) String material,
+            @RequestParam(required = false) String color,
+            @RequestParam(required = false) String style,
+            @RequestParam(required = false) BigDecimal minPrice,
+            @RequestParam(required = false) BigDecimal maxPrice,
+            @RequestParam(required = false) Boolean featured,
+            @RequestParam(required = false) String sort,
+            @RequestParam(required = false) Integer page,
+            @RequestParam(required = false) Integer pageSize
+    ) {
+        int p = page == null || page < 0 ? 0 : page;
+        int s = pageSize == null || pageSize < 1 ? 1000 : Math.min(pageSize, 1000);
+        return queryPaged(category, subcategory, brand, brandId, q, finish, material, color, style, minPrice, maxPrice, featured, sort, p, s).getContent();
     }
-    @GetMapping("/suggestions") public List<ProductSuggestion> suggestions(@RequestParam String q) {
+
+    @GetMapping("/paged")
+    public PagedProductResponse pagedList(
+            @RequestParam(required = false) String category,
+            @RequestParam(required = false) String subcategory,
+            @RequestParam(required = false) String brand,
+            @RequestParam(required = false) Long brandId,
+            @RequestParam(required = false) String q,
+            @RequestParam(required = false) String finish,
+            @RequestParam(required = false) String material,
+            @RequestParam(required = false) String color,
+            @RequestParam(required = false) String style,
+            @RequestParam(required = false) BigDecimal minPrice,
+            @RequestParam(required = false) BigDecimal maxPrice,
+            @RequestParam(required = false) Boolean featured,
+            @RequestParam(required = false) String sort,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "24") int pageSize
+    ) {
+        int p = Math.max(0, page);
+        int s = Math.min(Math.max(1, pageSize), 100);
+        Page<Product> res = queryPaged(category, subcategory, brand, brandId, q, finish, material, color, style, minPrice, maxPrice, featured, sort, p, s);
+        return new PagedProductResponse(
+                res.getContent(),
+                res.getNumber(),
+                res.getSize(),
+                res.getTotalElements(),
+                res.getTotalPages(),
+                res.hasNext(),
+                res.isFirst(),
+                res.isLast()
+        );
+    }
+
+    private Page<Product> queryPaged(String category, String subcategory, String brand, Long brandId, String q,
+                                     String finish, String material, String color, String style,
+                                     BigDecimal minPrice, BigDecimal maxPrice, Boolean featured,
+                                     String sort, int page, int pageSize) {
+        Sort sortObj = buildSort(sort);
+        Pageable pageable = PageRequest.of(page, pageSize, sortObj);
+
+        org.springframework.data.jpa.domain.Specification<Product> spec = (root, query, cb) -> {
+            List<jakarta.persistence.criteria.Predicate> predicates = new ArrayList<>();
+            predicates.add(cb.isTrue(root.get("active")));
+
+            if (category != null && !category.isBlank() && !category.equalsIgnoreCase("All")) {
+                predicates.add(cb.equal(cb.lower(root.get("category")), category.trim().toLowerCase()));
+            }
+            if (subcategory != null && !subcategory.isBlank() && !subcategory.equalsIgnoreCase("All")) {
+                predicates.add(cb.equal(cb.lower(root.get("subcategory")), subcategory.trim().toLowerCase()));
+            }
+            if (brandId != null) {
+                predicates.add(cb.equal(root.get("brandId"), brandId));
+            }
+            if (brand != null && !brand.isBlank() && !brand.equalsIgnoreCase("All")) {
+                predicates.add(cb.equal(cb.lower(root.get("brandName")), brand.trim().toLowerCase()));
+            }
+            if (finish != null && !finish.isBlank() && !finish.equalsIgnoreCase("All")) {
+                predicates.add(cb.equal(cb.lower(root.get("finish")), finish.trim().toLowerCase()));
+            }
+            if (material != null && !material.isBlank() && !material.equalsIgnoreCase("All")) {
+                predicates.add(cb.equal(cb.lower(root.get("material")), material.trim().toLowerCase()));
+            }
+            if (color != null && !color.isBlank() && !color.equalsIgnoreCase("All")) {
+                predicates.add(cb.equal(cb.lower(root.get("color")), color.trim().toLowerCase()));
+            }
+            if (style != null && !style.isBlank() && !style.equalsIgnoreCase("All")) {
+                predicates.add(cb.equal(cb.lower(root.get("style")), style.trim().toLowerCase()));
+            }
+            if (minPrice != null) {
+                predicates.add(cb.greaterThanOrEqualTo(root.get("price"), minPrice));
+            }
+            if (maxPrice != null) {
+                predicates.add(cb.lessThanOrEqualTo(root.get("price"), maxPrice));
+            }
+            if (featured != null) {
+                predicates.add(cb.equal(root.get("featured"), featured));
+            }
+            if (q != null && !q.isBlank()) {
+                String pattern = "%" + q.trim().toLowerCase() + "%";
+                predicates.add(cb.or(
+                        cb.like(cb.lower(root.get("name")), pattern),
+                        cb.like(cb.lower(cb.coalesce(root.get("description"), "")), pattern),
+                        cb.like(cb.lower(root.get("slug")), pattern),
+                        cb.like(cb.lower(cb.coalesce(root.get("brandName"), "")), pattern),
+                        cb.like(cb.lower(cb.coalesce(root.get("subcategory"), "")), pattern)
+                ));
+            }
+            return cb.and(predicates.toArray(new jakarta.persistence.criteria.Predicate[0]));
+        };
+
+        return repository.findAll(spec, pageable);
+    }
+
+    private Sort buildSort(String sort) {
+        String s = sort == null ? "featured" : sort.trim().toLowerCase();
+        return switch (s) {
+            case "price_asc" -> Sort.by(Sort.Direction.ASC, "price");
+            case "price_desc" -> Sort.by(Sort.Direction.DESC, "price");
+            case "name_asc" -> Sort.by(Sort.Direction.ASC, "name");
+            case "newest" -> Sort.by(Sort.Direction.DESC, "id");
+            default -> Sort.by(Sort.Direction.DESC, "featured")
+                    .and(Sort.by(Sort.Direction.ASC, "sortOrder"))
+                    .and(Sort.by(Sort.Direction.ASC, "name"));
+        };
+    }
+
+    @GetMapping("/suggestions")
+    public List<ProductSuggestion> suggestions(@RequestParam String q) {
         String term = blankToNull(q);
-        if (term == null || term.length()<2)return List.of();
-        return repository.suggestActive(term, org.springframework.data.domain.PageRequest.of(0, 8)).stream().map(ProductSuggestion::new).toList();
+        if (term == null || term.length() < 2) return List.of();
+        return repository.suggestActive(term, PageRequest.of(0, 8)).stream().map(ProductSuggestion::new).toList();
     }
-    public record ProductSuggestion(Long id, String slug, String name, String category, String imageUrl, java.math.BigDecimal price) {
+
+    public record ProductSuggestion(Long id, String slug, String name, String category, String subcategory, String brandName, String imageUrl, BigDecimal price) {
         ProductSuggestion(Product p) {
-            this(p.getId(), p.getSlug(), p.getName(), p.getCategory(), p.getImageUrl(), p.getPrice());
+            this(p.getId(), p.getSlug(), p.getName(), p.getCategory(), p.getSubcategory(), p.getBrandName(), p.getImageUrl(), p.getPrice());
         }
     }
-    @GetMapping("/filters") public Map<String, List<String>> filters() {
-        return Map.of("categories", repository.findDistinctCategories(), "materials", repository.findDistinctMaterials(), "colors",
-        repository.findDistinctColors(), "styles", repository.findDistinctStyles(), "finishes",
-        repository.findDistinctFinishes());
+
+    @GetMapping("/filters")
+    public Map<String, Object> filters() {
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("categories", repository.findDistinctCategories());
+        map.put("subcategories", repository.findDistinctSubcategories());
+        map.put("brands", repository.findDistinctBrands());
+        map.put("materials", repository.findDistinctMaterials());
+        map.put("colors", repository.findDistinctColors());
+        map.put("styles", repository.findDistinctStyles());
+        map.put("finishes", repository.findDistinctFinishes());
+        map.put("minPrice", repository.findMinPrice());
+        map.put("maxPrice", repository.findMaxPrice());
+        return map;
     }
-    @GetMapping("/{slug}") public Product get(@PathVariable String slug) {
+
+    @GetMapping("/{slug}")
+    public Product get(@PathVariable String slug) {
         return repository.findBySlug(slug).filter(Product::isActive).orElseThrow(() -> new NoSuchElementException("Product not found"));
     }
-    @GetMapping("/{slug}/variants") public List<ProductVariantView> variants(@PathVariable String slug) {
+
+    @GetMapping("/{slug}/variants")
+    public List<ProductVariantFullView> variants(@PathVariable String slug) {
         Product p = get(slug);
-        return variants.findByProductIdAndActiveTrueOrderByOptionNameAscOptionValueAsc(p.getId()).stream().map(ProductVariantView::new).toList();
+        return variants.findByProductIdAndActiveTrueOrderBySortOrderAscIdAsc(p.getId()).stream().map(ProductVariantFullView::new).toList();
     }
-    public record ProductVariantView(Long id, String optionName, String optionValue, String sku, java.math.BigDecimal priceOverride, boolean active) {
-        ProductVariantView(ProductVariant v) {
-            this(v.getId(), v.getOptionName(), v.getOptionValue(), v.getSku(), v.getPriceOverride(), v.isActive());
+
+    public record ProductVariantFullView(
+            Long id,
+            Long productId,
+            String optionName,
+            String optionValue,
+            String title,
+            String sku,
+            String color,
+            String material,
+            String size,
+            String finish,
+            String dimensions,
+            BigDecimal price,
+            BigDecimal priceOverride,
+            int stockQuantity,
+            String imageUrl,
+            String attributesJson,
+            boolean active
+    ) {
+        public ProductVariantFullView(ProductVariant v) {
+            this(
+                    v.getId(),
+                    v.getProduct().getId(),
+                    v.getOptionName(),
+                    v.getOptionValue(),
+                    v.getTitle(),
+                    v.getSku(),
+                    v.getColor(),
+                    v.getMaterial(),
+                    v.getSize(),
+                    v.getFinish(),
+                    v.getDimensions(),
+                    v.getPrice(),
+                    v.getPriceOverride(),
+                    v.getStockQuantity(),
+                    v.getImageUrl(),
+                    v.getAttributesJson(),
+                    v.isActive()
+            );
         }
     }
+
+    public record PagedProductResponse(
+            List<Product> content,
+            int page,
+            int pageSize,
+            long totalElements,
+            int totalPages,
+            boolean hasNext,
+            boolean isFirst,
+            boolean isLast
+    ) {}
+
     private String blankToNull(String v) {
-        return v == null || v.isBlank()?null:v.trim();
+        return v == null || v.isBlank() ? null : v.trim();
     }
 }

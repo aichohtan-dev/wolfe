@@ -7,7 +7,7 @@ spring:
   datasource:
     url: ${DATABASE_URL:jdbc:postgresql://localhost:5432/wolfe}
     username: ${DATABASE_USERNAME:wolfe}
-    password: ${DATABASE_PASSWORD:}
+    password: ${DATABASE_PASSWORD:wolfe}
   jpa:
     hibernate:
       ddl-auto: validate
@@ -26,6 +26,9 @@ management:
     health:
       probes:
         enabled: true
+WOLFE_JWT_SECRET: "wolfe-development-jwt-secret-key-at-least-32-chars-2026"
+WOLFE_JWT_TTL_SECONDS: 900
+WOLFE_FRONTEND_ORIGIN: "http://localhost:5173"
 springdoc:
   api-docs:
     enabled: ${WOLFE_OPENAPI_ENABLED:false}
