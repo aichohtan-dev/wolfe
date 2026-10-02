@@ -56,6 +56,10 @@ Only **one blocker** remains to complete live Flyway execution and live concurre
 
 **Security note:** Existing PostgreSQL passwords should not be brute-forced or exposed. Use a dedicated local test role/database and environment variables.
 
+## 9. GitHub CI Trigger
+
+A documentation-only commit to this report is being used to trigger the repository's existing `push`-based GitHub Actions workflows on `main`. This does not change application logic.
+
 ## Current Runtime Certification Status
 
 **NOT YET CERTIFIED.** PostgreSQL is listening and Redis is healthy, but the live Spring Boot database context, Flyway execution against the test database, live integration tests, and real concurrency tests remain pending PostgreSQL authentication/setup.
