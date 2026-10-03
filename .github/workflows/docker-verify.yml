@@ -78,6 +78,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p /tmp/wolfe-backups
+          chmod +x ops/backup-all.sh ops/verify-backup.sh
           WOLFE_BACKUP_KEY="$WOLFE_BACKUP_KEY" ./ops/backup-all.sh /tmp/wolfe-backups
           WOLFE_BACKUP_KEY="$WOLFE_BACKUP_KEY" ./ops/verify-backup.sh /tmp/wolfe-backups/postgres/*.dump.enc /tmp/wolfe-backups/media/*.tar.gz.enc
           docker compose exec -T postgres createdb -U "${POSTGRES_USER:-wolfe}" wolfe_restore_test
