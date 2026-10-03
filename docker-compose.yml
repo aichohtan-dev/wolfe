@@ -54,7 +54,7 @@ services:
       DATABASE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-wolfe}
       DATABASE_USERNAME: ${POSTGRES_USER:-wolfe}
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the environment or .env}
-      REDIS_URL: redis://redis:6379
+      REDIS_URL: redis://wolfe:${REDIS_PASSWORD}@redis:6379
       REDIS_USERNAME: wolfe
       REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD in the environment or .env}
       WOLFE_JWT_SECRET: ${WOLFE_JWT_SECRET:?Set WOLFE_JWT_SECRET in the environment or .env}
