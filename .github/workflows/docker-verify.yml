@@ -71,7 +71,7 @@ jobs:
           done
 
       - name: Database integrity preflight
-        run: ./ops/preflight-v43-integrity.sh
+        run: chmod +x ops/preflight-v43-integrity.sh && ./ops/preflight-v43-integrity.sh
 
 
       - name: Verify encrypted backup and isolated PostgreSQL restore
