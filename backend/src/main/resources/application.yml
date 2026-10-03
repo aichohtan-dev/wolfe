@@ -55,10 +55,6 @@ management:
   otlp:
     tracing:
       endpoint: ${WOLFE_OTLP_ENDPOINT:http://localhost:4318/v1/traces}
-WOLFE_JWT_SECRET: ${WOLFE_JWT_SECRET:}
-WOLFE_JWT_TTL_SECONDS: 900
-WOLFE_FRONTEND_ORIGIN: "http://localhost:5173"
-WOLFE_PUBLIC_BASE_URL: ${WOLFE_PUBLIC_BASE_URL:http://localhost}
 springdoc:
   api-docs:
     enabled: ${WOLFE_OPENAPI_ENABLED:false}
@@ -66,6 +62,4 @@ springdoc:
     enabled: ${WOLFE_OPENAPI_ENABLED:false}
     path: /swagger-ui.html
 
-WOLFE_MAX_SESSIONS: ${WOLFE_MAX_SESSIONS:5}
 
-WOLFE_CONFIGURATION_TTL_DAYS: ${WOLFE_CONFIGURATION_TTL_DAYS:30}
