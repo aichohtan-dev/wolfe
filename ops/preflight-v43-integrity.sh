@@ -12,7 +12,11 @@ SELECT
 COMMIT;
 SQL
 )"
-VIOLATIONS="$(printf '%s\n' "$RESULT" | tail -1 | tr -d '[:space:]')"
+VIOLATIONS="$(printf '%s\n' "$RESULT" | grep -E '^[[:space:]]*[0-9]+[[:space:]]*
+case "$VIOLATIONS" in ''|*[!0-9]*) echo "Invalid preflight result: $VIOLATIONS" >&2; exit 1;; esac
+[ "$VIOLATIONS" -eq 0 ] || { echo "V43 preflight failed: $VIOLATIONS integrity violations" >&2; exit 1; }
+echo "V43 preflight PASS: all integrity violation counts are zero."
+ | tail -1 | tr -d '[:space:]')"
 case "$VIOLATIONS" in ''|*[!0-9]*) echo "Invalid preflight result: $VIOLATIONS" >&2; exit 1;; esac
 [ "$VIOLATIONS" -eq 0 ] || { echo "V43 preflight failed: $VIOLATIONS integrity violations" >&2; exit 1; }
 echo "V43 preflight PASS: all integrity violation counts are zero."
