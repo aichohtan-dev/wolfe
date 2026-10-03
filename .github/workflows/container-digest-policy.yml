@@ -5,6 +5,7 @@ on:
     paths:
       - "Dockerfile*"
       - "docker-compose*.yml"
+      - ".github/workflows/container-digest-policy.yml"
 jobs:
   check:
     runs-on: ubuntu-latest
