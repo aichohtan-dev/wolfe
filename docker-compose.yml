@@ -92,7 +92,7 @@ services:
       dockerfile: Dockerfile.frontend
     security_opt: ["no-new-privileges:true"]
     cap_drop: ["ALL"]
-    cap_add: ["NET_BIND_SERVICE"]
+    cap_add: ["NET_BIND_SERVICE", "CHOWN", "DAC_OVERRIDE", "SETUID", "SETGID"]
     read_only: true
     tmpfs: ["/var/cache/nginx", "/var/run", "/etc/nginx/conf.d"]
     logging:
