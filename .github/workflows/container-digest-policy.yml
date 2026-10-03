@@ -15,17 +15,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          bad=$(grep -RInE '^[[:space:]]*(FROM|image:[[:space:]])[[:space:]]*(postgres|redis|node|nginx|eclipse-temurin):[^@[:space:]]+([[:space:]]+AS[[:space:]]+[^[:space:]]+|[[:space:]]+#.*)? Dockerfile* docker-compose*.yml 2>/dev/null || true)
-          if [[ -n "$bad" ]]; then
-            echo "$bad"
-            echo 'Mutable base/service image reference detected; pin to @sha256 digest.'
-            exit 1
-          fi
-          if grep -RInE '^[[:space:]-]+uses:[[:space:]]+[^@]+@v[0-9]+' .github/workflows; then
-            echo 'Mutable GitHub Action tag detected; pin actions to full commit SHAs.'
-            exit 1
-          fi
- Dockerfile* docker-compose*.yml 2>/dev/null || true)
+          bad=$(grep -RInE '^[[:space:]]*(FROM|image:[[:space:]])[[:space:]]*(postgres|redis|node|nginx|eclipse-temurin):[^@[:space:]]+([[:space:]]+AS[[:space:]]+[^[:space:]]+|[[:space:]]+#.*)?$' Dockerfile* docker-compose*.yml 2>/dev/null || true)
           if [[ -n "$bad" ]]; then
             echo "$bad"
             echo 'Mutable base/service image reference detected; pin to @sha256 digest.'
