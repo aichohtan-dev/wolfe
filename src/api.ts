@@ -1,55 +1,55 @@
 const API_BASE = (import.meta.env.VITE_API_URL || '/api/v1').replace(/\/$/, '');
-let refreshPromise: Promise<string | null> | null = null;
+let refreshPromise: Promise<boolean> | null = null;
 
-async function refreshAccessToken(): Promise<string | null> {
-    const refreshToken = localStorage.getItem('wolfe_refresh_token');
-    if (!refreshToken) return null;
+function getCookie(name: string): string | null {
+    const prefix = `${encodeURIComponent(name)}=`;
+    const part = document.cookie.split('; ').find(v => v.startsWith(prefix));
+    return part ? decodeURIComponent(part.slice(prefix.length)) : null;
+}
+
+async function ensureCsrfToken(): Promise<string | null> {
+    const existing = getCookie('XSRF-TOKEN');
+    if (existing) return existing;
+    try {
+        const res = await fetch(`${API_BASE}/customers/csrf`, { method: 'GET', credentials: 'include' });
+        if (!res.ok) return null;
+        const body = await res.json().catch(() => ({}));
+        return getCookie('XSRF-TOKEN') || body.token || null;
+    } catch { return null; }
+}
+
+async function refreshAccessToken(): Promise<boolean> {
     if (!refreshPromise) {
         refreshPromise = (async () => {
             try {
-                const res = await fetch(`${API_BASE}/customers/refresh`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ refreshToken })
-                });
-                if (!res.ok) throw new Error('refresh failed');
-                const data = await res.json();
-                localStorage.setItem('wolfe_access_token', data.accessToken);
-                localStorage.setItem('wolfe_refresh_token', data.refreshToken);
-                return data.accessToken as string;
-            } catch {
-                localStorage.removeItem('wolfe_access_token');
-                localStorage.removeItem('wolfe_refresh_token');
-                localStorage.removeItem('wolfe_user');
-                return null;
-            } finally {
-                refreshPromise = null;
-            }
+                const csrf = await ensureCsrfToken();
+                const res = await fetch(`${API_BASE}/customers/refresh`, { method: 'POST', credentials: 'include', headers: csrf ? { 'X-XSRF-TOKEN': csrf } : undefined });
+                if (!res.ok) return false;
+                return true;
+            } catch { return false; }
+            finally { refreshPromise = null; }
         })();
     }
     return refreshPromise;
 }
 
 async function request<T>(path: string, init: RequestInit = {}, retry = true): Promise<T> {
-    const token = localStorage.getItem('wolfe_access_token');
     const headers = new Headers(init.headers);
-    if (!(init.body instanceof FormData)) {
-        headers.set('Content-Type', 'application/json');
+    if (!(init.body instanceof FormData)) headers.set('Content-Type', 'application/json');
+    const method = (init.method || 'GET').toUpperCase();
+    if (!['GET', 'HEAD', 'OPTIONS'].includes(method)) {
+        const csrf = await ensureCsrfToken();
+        if (csrf) headers.set('X-XSRF-TOKEN', csrf);
     }
-    if (token) {
-        headers.set('Authorization', `Bearer ${token}`);
-    }
-    const res = await fetch(`${API_BASE}${path}`, { ...init, headers });
+    const res = await fetch(`${API_BASE}${path}`, { ...init, headers, credentials: 'include' });
     if (res.status === 401 && retry && !path.includes('/customers/refresh') && !path.includes('/customers/login')) {
         const next = await refreshAccessToken();
         if (next) return request<T>(path, init, false);
     }
     if (!res.ok) {
-        let body: any = {};
-        try {
-            body = await res.json();
-        } catch {}
-        throw new Error(body.error || `Request failed (${res.status})`);
+        let body: any = {}; try { body = await res.json(); } catch {}
+        const safeMessages: Record<number,string> = {400:'The request could not be completed.',401:'Please sign in again.',403:'You do not have permission for this action.',404:'The requested resource was not found.',409:'The request conflicts with the current state.',413:'The request is too large.',429:'Too many requests. Please try again later.',500:'Something went wrong. Please try again.',503:'The service is temporarily unavailable. Please try again later.'};
+        throw new Error(safeMessages[res.status] || `Request failed (${res.status})`);
     }
     if (res.status === 204) return undefined as T;
     return res.json();
@@ -60,6 +60,7 @@ export type Customer = {
     name: string;
     email: string;
     phone?: string;
+    emailVerified?: boolean;
 };
 
 export type ProductVariant = {
@@ -76,7 +77,7 @@ export type ProductVariant = {
     dimensions?: string;
     price: number;
     priceOverride?: number;
-    stockQuantity: number;
+    stockQuantity?: number;
     imageUrl?: string;
     attributesJson?: string;
     active: boolean;
@@ -239,14 +240,14 @@ export const api = {
     },
     login: (email: string, password: string) => request<any>('/customers/login', { method: 'POST', body: JSON.stringify({ email, password }) }),
     register: (name: string, email: string, password: string) => request<any>('/customers/register', { method: 'POST', body: JSON.stringify({ name, email, password }) }),
+    sessions: () => request<any[]>('/customers/sessions'),
+    revokeSession: (id: number) => request<void>(`/customers/sessions/${id}`, { method: 'DELETE' }),
+    changePassword: (currentPassword: string, newPassword: string) => request<void>('/customers/password', { method: 'POST', body: JSON.stringify({ currentPassword, newPassword }) }),
+    deleteAccount: () => request<void>('/customers/me', { method: 'DELETE' }),
+    requestEmailVerification: (email: string) => request<void>('/customers/verify-email/request', { method: 'POST', body: JSON.stringify({ email }) }),
     logout: async () => {
-        const refreshToken = localStorage.getItem('wolfe_refresh_token');
-        try {
-            await request<void>('/customers/logout', { method: 'POST', body: JSON.stringify({ refreshToken }) }, false);
-        } finally {
-            localStorage.removeItem('wolfe_access_token');
-            localStorage.removeItem('wolfe_refresh_token');
-        }
+        try { await request<void>('/customers/logout', { method: 'POST' }, false); }
+        finally { localStorage.removeItem('wolfe_user'); }
     },
     bundles: {
         list: () => request<any[]>('/bundles'),
@@ -254,8 +255,22 @@ export const api = {
     },
     cart: {
         get: (id: number) => request<any[]>(`/cart/${id}`),
-        put: (id: number, slug: string, quantity: number) => request<any>(`/cart/${id}/${encodeURIComponent(slug)}?quantity=${quantity}`, { method: 'PUT' }),
-        remove: (id: number, slug: string) => request<void>(`/cart/${id}/${encodeURIComponent(slug)}`, { method: 'DELETE' })
+        put: (id: number, slug: string, quantity: number, variantId?: number, bundleId?: number, configurationToken?: string) => {
+            const p = new URLSearchParams({ quantity: String(quantity) });
+            if (variantId != null) p.set('variantId', String(variantId));
+            if (bundleId != null) p.set('bundleId', String(bundleId));
+            if (configurationToken) p.set('configurationToken', configurationToken);
+            return request<any>(`/cart/${id}/${encodeURIComponent(slug)}?${p.toString()}`, { method: 'PUT' });
+        },
+        remove: (id: number, slug: string, variantId?: number, bundleId?: number, configurationToken?: string) => {
+            const p = new URLSearchParams();
+            if (variantId != null) p.set('variantId', String(variantId));
+            if (bundleId != null) p.set('bundleId', String(bundleId));
+            if (configurationToken) p.set('configurationToken', configurationToken);
+            const query = p.toString();
+            return request<void>(`/cart/${id}/${encodeURIComponent(slug)}${query ? `?${query}` : ''}`, { method: 'DELETE' });
+        },
+        clear: (id: number) => request<void>(`/cart/${id}`, { method: 'DELETE' })
     },
     wishlist: {
         get: (id: number) => request<string[]>(`/wishlist/${id}/slugs`),
@@ -264,8 +279,8 @@ export const api = {
         add: (id: number, slug: string) => request<any[]>(`/wishlist/${id}/${encodeURIComponent(slug)}`, { method: 'PUT' }),
         remove: (id: number, slug: string) => request<void>(`/wishlist/${id}/${encodeURIComponent(slug)}`, { method: 'DELETE' })
     },
-    shippingQuote: (subtotal: number, shippingMethod: string = 'STANDARD', couponCode?: string) =>
-        request(`/orders/shipping-quote?subtotal=${Math.round(subtotal * 100)}&shippingMethod=${encodeURIComponent(shippingMethod)}${couponCode ? `&couponCode=${encodeURIComponent(couponCode)}` : ''}`),
+    shippingQuote: (subtotal: number, shippingMethod: string = 'STANDARD') =>
+        request(`/orders/shipping-quote?subtotal=${Math.round(subtotal * 100)}&shippingMethod=${encodeURIComponent(shippingMethod)}`),
     couponQuote: (subtotal: number, couponCode: string) =>
         request(`/orders/coupon-quote?subtotal=${Math.round(subtotal * 100)}&couponCode=${encodeURIComponent(couponCode)}`),
     order: (body: {
@@ -287,7 +302,7 @@ export const api = {
             variantId?: number;
             variantSku?: string;
         }[];
-    }) => request<any>('/orders', { method: 'POST', body: JSON.stringify(body) }),
+    }, idempotencyKey?: string) => request<any>('/orders', { method: 'POST', headers: { 'Idempotency-Key': idempotencyKey || (globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`).slice(0, 100) }, body: JSON.stringify(body) }),
     orderDetail: (id: string) => request<any>(`/orders/${encodeURIComponent(id)}`),
     orderHistory: (id: string) => request<any[]>(`/orders/${encodeURIComponent(id)}/history`),
     customerOrders: (id: number) => request<any[]>(`/orders/customer/${id}`),
@@ -300,7 +315,7 @@ export const api = {
     },
     returns: {
         get: (id: number) => request<any[]>(`/customers/${id}/returns`),
-        create: (id: number, orderId: string, reason: string) => request<any>(`/customers/${id}/returns/${encodeURIComponent(orderId)}`, { method: 'POST', body: JSON.stringify({ reason }) })
+        create: (id: number, orderId: string, reason: string, items?: { orderItemId: number; quantity: number }[]) => request<any>(`/customers/${id}/returns/${encodeURIComponent(orderId)}`, { method: 'POST', body: JSON.stringify({ reason, items }) })
     },
     notifications: {
         get: (id: number) => request<any>(`/customers/${id}/notifications`),
@@ -313,11 +328,14 @@ export const api = {
     },
     quotes: {
         get: (id: number) => request<any[]>(`/quotes/customers/${id}`),
-        create: (id: number, body: any) => request<any>(`/quotes/customers/${id}`, { method: 'POST', body: JSON.stringify(body) })
+        create: (id: number, body: { message: string; captchaToken?: string; website?: string }) => request<any>(`/quotes/customers/${id}`, { method: 'POST', body: JSON.stringify(body) })
     },
     customDesign: {
         get: (id: number) => request<any[]>(`/custom-design/customers/${id}`),
-        create: (id: number, body: any) => request<any>(`/custom-design/customers/${id}`, { method: 'POST', body: JSON.stringify(body) })
+        create: (id: number, body: { projectName: string; requirements?: string; referenceImageUrl?: string; captchaToken?: string; website?: string }) => request<any>(`/custom-design/customers/${id}`, { method: 'POST', body: JSON.stringify(body) })
+    },
+    consultations: {
+        create: (body: { name: string; email: string; project?: string; message: string; captchaToken?: string; website?: string }) => request<any>('/consultations', { method: 'POST', body: JSON.stringify(body) })
     },
     admin: {
         brands: () => request<Brand[]>('/admin/brands'),
@@ -390,14 +408,22 @@ export const api = {
         quoteStatus: (id: number, status: string) => request<any>(`/admin/quotes/${id}/status`, { method: 'PUT', body: JSON.stringify({ status }) }),
         customDesign: () => request<any[]>('/admin/custom-design'),
         customDesignStatus: (id: number, status: string) => request<any>(`/admin/custom-design/${id}/status`, { method: 'PUT', body: JSON.stringify({ status }) }),
+        consultations: () => request<any[]>('/consultations/admin'),
+        consultationStatus: (id: number, status: string) => request<any>(`/consultations/admin/${id}/status`, { method: 'PUT', body: JSON.stringify({ status }) }),
         visualContent: () => request<any[]>('/admin/visual-content'),
         createVisualContent: (body: any) => request<any>('/admin/visual-content', { method: 'POST', body: JSON.stringify(body) }),
         updateVisualContent: (id: number, body: any) => request<any>(`/admin/visual-content/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
         deleteVisualContent: (id: number) => request<void>(`/admin/visual-content/${id}`, { method: 'DELETE' }),
+        listSpin: (id: number) => request<any[]>(`/admin/experience/products/${id}/spin`),
         spin: (id: number, body: any) => request<any>(`/admin/experience/products/${id}/spin`, { method: 'POST', body: JSON.stringify(body) }),
+        updateSpin: (id: number, body: any) => request<any>(`/admin/experience/spin/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
         deleteSpin: (id: number) => request<void>(`/admin/experience/spin/${id}`, { method: 'DELETE' }),
+        getVisualAsset: (id: number) => request<any>(`/admin/experience/products/${id}/visual-asset`),
         visualAsset: (id: number, body: any) => request<any>(`/admin/experience/products/${id}/visual-asset`, { method: 'PUT', body: JSON.stringify(body) }),
+        deleteVisualAsset: (id: number) => request<void>(`/admin/experience/products/${id}/visual-asset`, { method: 'DELETE' }),
+        listHotspots: (id: number) => request<any[]>(`/admin/experience/visual/${id}/hotspots`),
         hotspot: (id: number, body: any) => request<any>(`/admin/experience/visual/${id}/hotspots`, { method: 'POST', body: JSON.stringify(body) }),
+        updateHotspot: (id: number, body: any) => request<any>(`/admin/experience/hotspots/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
         deleteHotspot: (id: number) => request<void>(`/admin/experience/hotspots/${id}`, { method: 'DELETE' }),
         stockSubscriptions: () => request<any[]>('/admin/experience/back-in-stock'),
         cartRecovery: () => request<any[]>('/admin/experience/cart-recovery'),
@@ -435,8 +461,11 @@ export const api = {
                 request<{ content: RetailerSettlement[]; totalElements: number; totalPages: number }>(
                     `/admin/retailers/settlements?page=${page}&size=${size}${retailerId ? `&retailerId=${retailerId}` : ''}${status ? `&status=${status}` : ''}`
                 ),
+            reconcileCash: (id: number, expectedAmount: number, collectedAmount: number, depositedAmount: number, referenceNumber: string) =>
+                request<RetailerSettlement>(`/admin/retailers/settlements/${id}/reconcile-cash`, { method: 'POST', body: JSON.stringify({ expectedAmount, collectedAmount, depositedAmount, referenceNumber }) }),
             settle: (id: number, referenceNumber: string) =>
-                request<RetailerSettlement>(`/admin/retailers/settlements/${id}/settle`, { method: 'POST', body: JSON.stringify({ referenceNumber }) })
+                request<RetailerSettlement>(`/admin/retailers/settlements/${id}/settle`, { method: 'POST', body: JSON.stringify({ referenceNumber }) }),
+            collectRecovery: (id: number, reference: string) => request<RetailerSettlement>(`/admin/retailers/settlements/${id}/recovery`, { method: 'POST', body: JSON.stringify({ reference }) })
         }
     },
     retailer: {
@@ -574,8 +603,14 @@ export type RetailerSettlement = {
     grossAmount: number;
     wolfeMarginAmount: number;
     retailerPayableAmount: number;
-    status: 'PENDING' | 'ELIGIBLE' | 'PROCESSING' | 'SETTLED' | 'HELD' | 'ADJUSTED';
+    recoveryDueAmount?: number;
+    status: 'PENDING' | 'ELIGIBLE' | 'PROCESSING' | 'SETTLED' | 'HELD' | 'ADJUSTED' | 'RECOVERY_DUE';
     referenceNumber?: string;
+    cashExpectedAmount?: number;
+    cashCollectedAmount?: number;
+    cashDepositedAmount?: number;
+    cashReconciliationStatus?: 'NOT_REQUIRED' | 'PENDING' | 'RECONCILED';
+    cashReconciliationReference?: string;
     settledAt?: string;
     notes?: string;
     createdAt: string;

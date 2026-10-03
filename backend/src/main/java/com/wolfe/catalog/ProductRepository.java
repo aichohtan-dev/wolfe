@@ -11,6 +11,8 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
     Optional<Product> findBySlug(String slug);
     Optional<Product> findBySlugIgnoreCase(String slug);
     List<Product> findAllByOrderBySortOrderAscNameAsc();
+    List<Product> findAllByActiveTrueOrderByIdAsc(org.springframework.data.domain.Pageable pageable);
+    List<Product> findAllByIdInAndActiveTrue(Collection<Long> ids);
 
     @Query("SELECT p FROM Product p WHERE p.active = true " +
            "AND (:q IS NULL OR lower(p.name) LIKE lower(concat('%', :q, '%')) OR lower(p.description) LIKE lower(concat('%', :q, '%')) OR lower(p.slug) LIKE lower(concat('%', :q, '%')) OR lower(coalesce(p.brandName, '')) LIKE lower(concat('%', :q, '%')) OR lower(coalesce(p.subcategory, '')) LIKE lower(concat('%', :q, '%'))) " +
@@ -95,4 +97,5 @@ public interface ProductRepository extends JpaRepository<Product, Long>, JpaSpec
            "AND (lower(p.category) = lower(:category) OR lower(p.material) = lower(:material) OR lower(p.style) = lower(:style)) " +
            "ORDER BY CASE WHEN lower(p.category) = lower(:category) THEN 0 ELSE 1 END, p.featured DESC, p.sortOrder ASC, p.name ASC")
     List<Product> findRelated(@Param("id") Long id, @Param("category") String category, @Param("material") String material, @Param("style") String style, Pageable pageable);
+    long countByActiveTrue();
 }

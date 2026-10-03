@@ -7,6 +7,7 @@ import jakarta.persistence.*;
 public class VisualContent {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY) private Long id;
+    @Version private long version;
     @Column(nullable = false, length = 80) private String placement;
     @Column(nullable = false, length = 120) private String title;
     @Column(length = 500) private String subtitle;

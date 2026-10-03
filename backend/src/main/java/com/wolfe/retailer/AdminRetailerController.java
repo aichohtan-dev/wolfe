@@ -5,20 +5,19 @@ import com.wolfe.order.OrderItem;
 import com.wolfe.order.OrderItemRepository;
 import com.wolfe.order.OrderRepository;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.*;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
-
 import java.math.BigDecimal;
 import java.util.*;
 
 @RestController
 @RequestMapping("/api/v1/admin/retailers")
+@org.springframework.security.access.prepost.PreAuthorize("hasAuthority('PERM_ADMIN_RETAILER')")
 public class AdminRetailerController {
     private final RetailerRepository retailerRepo;
     private final RetailerServiceAreaRepository serviceAreaRepo;
@@ -73,7 +72,7 @@ public class AdminRetailerController {
             @RequestParam(required = false) String query,
             @RequestParam(required = false) String status
     ) {
-        return retailerRepo.searchRetailers(query, status, PageRequest.of(page, size, Sort.by("id").ascending()));
+        return retailerRepo.searchRetailers(query, status, PageRequest.of(Math.max(0, page), Math.min(Math.max(1, size), 100), Sort.by("id").ascending()));
     }
 
     @GetMapping("/{id}")
@@ -95,13 +94,15 @@ public class AdminRetailerController {
             @NotBlank String name,
             String ownerName,
             @NotBlank String email,
-            @NotBlank String phone,
+            @NotBlank @Pattern(regexp = "^\\+?[1-9]\\d{7,14}$") String phone,
             @NotBlank String address,
             @NotBlank String city,
             String state,
-            @NotBlank String pincode,
-            BigDecimal deliveryRadiusKm,
-            BigDecimal commissionRate
+            @NotBlank @Pattern(regexp = "^[1-9]\\d{5}$") @Pattern(regexp = "^[1-9]\\d{5}$") String pincode,
+            @DecimalMin(value = "0.0", inclusive = true) BigDecimal deliveryRadiusKm,
+            @jakarta.validation.constraints.DecimalMin("-90.0") @jakarta.validation.constraints.DecimalMax("90.0") BigDecimal latitude,
+            @jakarta.validation.constraints.DecimalMin("-180.0") @jakarta.validation.constraints.DecimalMax("180.0") BigDecimal longitude,
+            @jakarta.validation.constraints.DecimalMin("0.0") @jakarta.validation.constraints.DecimalMax("100.0") BigDecimal commissionRate
     ) {}
 
     @PostMapping
@@ -109,6 +110,7 @@ public class AdminRetailerController {
     public Retailer createRetailer(@Valid @RequestBody CreateRetailerRequest req, Authentication auth) {
         Retailer r = new Retailer(req.name(), req.ownerName(), req.email(), req.phone(), req.address(), req.city(), req.state(), req.pincode());
         if (req.deliveryRadiusKm() != null) r.setDeliveryRadiusKm(req.deliveryRadiusKm());
+        r.setCoordinates(req.latitude(), req.longitude());
         if (req.commissionRate() != null) r.setCommissionRate(req.commissionRate());
 
         Retailer saved = retailerRepo.save(r);
@@ -122,20 +124,22 @@ public class AdminRetailerController {
     public record UpdateRetailerRequest(
             String name,
             String ownerName,
-            String phone,
+            @Pattern(regexp = "^$|^\\+?[1-9]\\d{7,14}$") String phone,
             String address,
             String city,
             String state,
-            String pincode,
-            BigDecimal deliveryRadiusKm,
-            String status,
-            String verificationStatus,
-            String agreementStatus,
-            BigDecimal commissionRate
+            @Pattern(regexp = "^[1-9]\\d{5}$") String pincode,
+            @DecimalMin(value = "0.0", inclusive = true) BigDecimal deliveryRadiusKm,
+            @jakarta.validation.constraints.DecimalMin("-90.0") @jakarta.validation.constraints.DecimalMax("90.0") BigDecimal latitude,
+            @jakarta.validation.constraints.DecimalMin("-180.0") @jakarta.validation.constraints.DecimalMax("180.0") BigDecimal longitude,
+            @Pattern(regexp = "^(?i:PENDING|ACTIVE|SUSPENDED|INACTIVE)$") String status,
+            @Pattern(regexp = "^(?i:UNVERIFIED|VERIFIED)$") String verificationStatus,
+            @Pattern(regexp = "^(?i:PENDING|SIGNED)$") String agreementStatus,
+            @jakarta.validation.constraints.DecimalMin("0.0") @jakarta.validation.constraints.DecimalMax("100.0") BigDecimal commissionRate
     ) {}
 
     @PutMapping("/{id}")
-    public Retailer updateRetailer(@PathVariable Long id, @RequestBody UpdateRetailerRequest req, Authentication auth) {
+    public Retailer updateRetailer(@PathVariable Long id, @Valid @RequestBody UpdateRetailerRequest req, Authentication auth) {
         Retailer r = retailerRepo.findById(id).orElseThrow(() -> new NoSuchElementException("Retailer not found"));
         if (req.name() != null) r.setName(req.name());
         if (req.ownerName() != null) r.setOwnerName(req.ownerName());
@@ -145,6 +149,7 @@ public class AdminRetailerController {
         if (req.state() != null) r.setState(req.state());
         if (req.pincode() != null) r.setPincode(req.pincode());
         if (req.deliveryRadiusKm() != null) r.setDeliveryRadiusKm(req.deliveryRadiusKm());
+        if (req.latitude() != null || req.longitude() != null) r.setCoordinates(req.latitude(), req.longitude());
         if (req.status() != null) r.setStatus(req.status().toUpperCase());
         if (req.verificationStatus() != null) r.setVerificationStatus(req.verificationStatus().toUpperCase());
         if (req.agreementStatus() != null) r.setAgreementStatus(req.agreementStatus().toUpperCase());
@@ -159,7 +164,7 @@ public class AdminRetailerController {
     }
 
     // 2. Service Areas
-    public record AddServiceAreaRequest(@NotBlank String pincode, @NotBlank String city, String areaName, Integer deliveryEtaHours) {}
+    public record AddServiceAreaRequest(@NotBlank @Pattern(regexp = "^[1-9]\\d{5}$") String pincode, @NotBlank @Size(max = 100) String city, @Size(max = 150) String areaName, @Min(1) @Max(168) Integer deliveryEtaHours) {}
 
     @PostMapping("/{id}/service-areas")
     public RetailerServiceArea addServiceArea(@PathVariable Long id, @Valid @RequestBody AddServiceAreaRequest req) {
@@ -181,10 +186,10 @@ public class AdminRetailerController {
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false) String query
     ) {
-        return inventoryRepo.searchByRetailer(id, query, PageRequest.of(page, size, Sort.by("id").ascending()));
+        return inventoryRepo.searchByRetailer(id, query, PageRequest.of(Math.max(0, page), Math.min(Math.max(1, size), 100), Sort.by("id").ascending()));
     }
 
-    public record AdminAdjustStockRequest(@NotBlank String sku, @NotNull Integer newPhysicalStock, @NotBlank String reason) {}
+    public record AdminAdjustStockRequest(@NotBlank @Size(max = 100) String sku, @NotNull @Min(0) Integer newPhysicalStock, @NotBlank @Size(max = 500) String reason) {}
 
     @PostMapping("/{id}/inventory/adjust")
     public RetailerInventory adjustRetailerStock(@PathVariable Long id, @Valid @RequestBody AdminAdjustStockRequest req, Authentication auth) {
@@ -200,13 +205,13 @@ public class AdminRetailerController {
         Optional<RetailerOrderAssignment> currentAssignment = assignmentRepo.findTopByOrderIdOrderByIdDesc(orderId);
         Fulfillment fulfillment = fulfillmentRepo.findByOrderId(orderId).orElse(null);
 
-        return Map.of(
-                "order", order,
-                "items", items,
-                "currentAssignment", currentAssignment.orElse(null),
-                "fulfillment", fulfillment != null ? fulfillment : Map.of(),
-                "candidates", candidates
-        );
+        Map<String, Object> response = new java.util.LinkedHashMap<>();
+        response.put("order", order);
+        response.put("items", items);
+        response.put("currentAssignment", currentAssignment.orElse(null));
+        response.put("fulfillment", fulfillment != null ? fulfillment : Map.of());
+        response.put("candidates", candidates);
+        return response;
     }
 
     public record AssignOrderRequest(@NotNull Long retailerId, String notes) {}
@@ -223,7 +228,7 @@ public class AdminRetailerController {
         return marginRepo.findByActiveTrueOrderByPriorityDesc();
     }
 
-    public record CreateMarginRuleRequest(Long retailerId, String category, Long productId, Long variantId, String marginType, @NotNull BigDecimal marginValue, Integer priority) {}
+    public record CreateMarginRuleRequest(Long retailerId, String category, Long productId, Long variantId, @NotBlank String marginType, @NotNull @jakarta.validation.constraints.Positive BigDecimal marginValue, Integer priority) {}
 
     @PostMapping("/margin-rules")
     @ResponseStatus(HttpStatus.CREATED)
@@ -249,10 +254,23 @@ public class AdminRetailerController {
             @RequestParam(required = false) Long retailerId,
             @RequestParam(required = false) String status
     ) {
-        return settlementRepo.searchSettlements(retailerId, status, PageRequest.of(page, size));
+        return settlementRepo.searchSettlements(retailerId, status, PageRequest.of(Math.max(0, page), Math.min(Math.max(1, size), 100)));
     }
 
     public record SettleRequest(@NotBlank String referenceNumber) {}
+    public record CashReconciliationRequest(@jakarta.validation.constraints.PositiveOrZero long expectedAmount, @jakarta.validation.constraints.PositiveOrZero long collectedAmount, @jakarta.validation.constraints.PositiveOrZero long depositedAmount, @NotBlank String referenceNumber) {}
+
+    @PostMapping("/settlements/{id}/reconcile-cash")
+    public RetailerSettlement reconcileCash(@PathVariable Long id, @Valid @RequestBody CashReconciliationRequest req, Authentication auth) {
+        return settlementService.reconcileCash(id, req.expectedAmount(), req.collectedAmount(), req.depositedAmount(), req.referenceNumber(), auth != null ? auth.getName() : "ADMIN");
+    }
+
+    public record RecoveryCollectionRequest(@NotBlank String reference) {}
+
+    @PostMapping("/settlements/{id}/recovery")
+    public RetailerSettlement collectRecovery(@PathVariable Long id, @Valid @RequestBody RecoveryCollectionRequest req, Authentication auth) {
+        return settlementService.collectRecovery(id, req.reference(), auth != null ? auth.getName() : "ADMIN");
+    }
 
     @PostMapping("/settlements/{id}/settle")
     public RetailerSettlement settlePayment(@PathVariable Long id, @Valid @RequestBody SettleRequest req, Authentication auth) {
@@ -265,6 +283,6 @@ public class AdminRetailerController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "30") int size
     ) {
-        return auditRepo.findAllByOrderByCreatedAtDesc(PageRequest.of(page, size));
+        return auditRepo.findAllByOrderByCreatedAtDesc(PageRequest.of(Math.max(0, page), Math.min(Math.max(1, size), 100)));
     }
 }

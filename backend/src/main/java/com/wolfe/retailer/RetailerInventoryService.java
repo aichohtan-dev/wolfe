@@ -143,6 +143,19 @@ public class RetailerInventoryService {
         ));
     }
 
+    @Transactional
+    public void restockStock(Long retailerId, Long productId, Long variantId, String sku, int quantity, String orderId, String actor, String reason) {
+        RetailerInventory item = inventoryRepo.findByRetailerIdAndSkuForUpdate(retailerId, sku)
+                .orElseThrow(() -> new IllegalArgumentException("Inventory item not found for SKU: " + sku + " at retailer: " + retailerId));
+        int prevPhysical = item.getPhysicalStock();
+        item.adjustPhysicalStock(Math.addExact(prevPhysical, quantity));
+        inventoryRepo.save(item);
+        movementRepo.save(new InventoryMovement(retailerId, productId, variantId, sku, prevPhysical, quantity, item.getPhysicalStock(),
+                "RETURN_RESTOCK", orderId, actor, reason));
+        auditRepo.save(new RetailerAuditLog("RetailerInventory", String.valueOf(item.getId()), "RETURN_RESTOCK", actor,
+                "Restocked " + quantity + " units of " + sku + " for return/order " + orderId));
+    }
+
     public List<RetailerInventory> getLowStockAlerts(Long retailerId) {
         return inventoryRepo.findLowStockItems(retailerId);
     }

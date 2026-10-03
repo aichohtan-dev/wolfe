@@ -16,6 +16,7 @@ public class RetailerSettlementServiceTest {
     private RetailerSettlementRepository settlementRepo;
     private RetailerRepository retailerRepo;
     private RetailerAuditLogRepository auditRepo;
+    private RetailerSettlementAdjustmentRepository adjustmentRepo;
     private RetailerSettlementService service;
 
     @BeforeEach
@@ -24,7 +25,14 @@ public class RetailerSettlementServiceTest {
         settlementRepo = mock(RetailerSettlementRepository.class);
         retailerRepo = mock(RetailerRepository.class);
         auditRepo = mock(RetailerAuditLogRepository.class);
-        service = new RetailerSettlementService(marginRepo, settlementRepo, retailerRepo, auditRepo);
+        adjustmentRepo = mock(RetailerSettlementAdjustmentRepository.class);
+        service = new RetailerSettlementService(marginRepo, settlementRepo, retailerRepo, auditRepo, adjustmentRepo);
+    }
+
+    @Test
+    void cannotSettlePendingSettlement() {
+        RetailerSettlement settlement = new RetailerSettlement("WLF-1", 7L, 10000L, 1000L, 9000L);
+        assertThrows(IllegalStateException.class, () -> settlement.markSettled("REF-1"));
     }
 
     @Test
@@ -58,7 +66,7 @@ public class RetailerSettlementServiceTest {
 
     @Test
     void testSettlementLifecycle() {
-        when(settlementRepo.findByOrderIdAndRetailerId("WLF-ORD-01", 1L)).thenReturn(Optional.empty());
+        when(settlementRepo.findTopByOrderIdAndRetailerIdOrderByIdDesc("WLF-ORD-01", 1L)).thenReturn(Optional.empty());
         when(settlementRepo.save(any())).thenAnswer(i -> i.getArgument(0));
 
         RetailerSettlement s = service.initializeSettlement("WLF-ORD-01", 1L, 100000, 10000, 90000);

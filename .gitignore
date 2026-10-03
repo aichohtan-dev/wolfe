@@ -12,5 +12,6 @@ target/
 *.log
 *.tmp
 .pgdata/
+.test-pgdata/
 postgres.log
 *.tsbuildinfo

@@ -1,54 +1,53 @@
 package com.wolfe.cart;
 
 import jakarta.persistence.*;
-import java.io.Serializable;
 
 @Entity
 @Table(name = "cart_items")
-@IdClass(CartItem.Key.class)
 public class CartItem {
     @Id
-    @Column(name = "customer_id") private Long customerId;
-    @Id
-    @Column(name = "product_id") private Long productId;
-    @Column(nullable = false) private int quantity;
-    protected CartItem() {
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(name = "customer_id", nullable = false)
+    private Long customerId;
+
+    @Column(name = "product_id", nullable = false)
+    private Long productId;
+
+    @Column(name = "variant_id")
+    private Long variantId;
+
+    @Column(name = "bundle_id")
+    private Long bundleId;
+
+    @Column(name = "configuration_token", length = 64)
+    private String configurationToken;
+
+    @Column(nullable = false)
+    private int quantity;
+
+    protected CartItem() {}
+
+    public CartItem(Long customerId, Long productId, Long variantId, int quantity) {
+        this(customerId, productId, variantId, null, null, quantity);
     }
-    public CartItem(Long customerId, Long productId, int quantity) {
+
+    public CartItem(Long customerId, Long productId, Long variantId, Long bundleId, String configurationToken, int quantity) {
         this.customerId = customerId;
         this.productId = productId;
+        this.variantId = variantId;
+        this.bundleId = bundleId;
+        this.configurationToken = configurationToken;
         this.quantity = quantity;
     }
-    public Long getCustomerId() {
-        return customerId;
-    }
-    public Long getProductId() {
-        return productId;
-    }
-    public int getQuantity() {
-        return quantity;
-    }
-    public void setQuantity(int quantity) {
-        this.quantity = quantity;
-    }
-    public static class Key implements Serializable {
-        public Long customerId;
-        public Long productId;
-        public Key() {
-        }
-        public Key(Long c, Long p) {
-            customerId = c;
-            productId = p;
-        }
-        @Override
-        public boolean equals(Object o) {
-            if (this == o) return true;
-            if (!(o instanceof Key k)) return false;
-            return java.util.Objects.equals(customerId, k.customerId) && java.util.Objects.equals(productId, k.productId);
-        }
-        @Override
-        public int hashCode() {
-            return java.util.Objects.hash(customerId, productId);
-        }
-    }
+
+    public Long getId() { return id; }
+    public Long getCustomerId() { return customerId; }
+    public Long getProductId() { return productId; }
+    public Long getVariantId() { return variantId; }
+    public Long getBundleId() { return bundleId; }
+    public String getConfigurationToken() { return configurationToken; }
+    public int getQuantity() { return quantity; }
+    public void setQuantity(int quantity) { this.quantity = quantity; }
 }

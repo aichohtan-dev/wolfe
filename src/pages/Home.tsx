@@ -21,21 +21,21 @@ const editorial = [
     copy: 'Refined pulls for kitchens, wardrobes and furniture.',
     image:
       'https://images.unsplash.com/photo-1600566753086-00f18fb6b3ea?auto=format&fit=crop&w=1200&q=85',
-    category: 'Handles',
+    subcategory: 'Handles',
   },
   {
     title: 'Knobs',
     copy: 'Small details with a distinct point of view.',
     image:
       'https://images.unsplash.com/photo-1600607687920-4e2a09cf159d?auto=format&fit=crop&w=1200&q=85',
-    category: 'Knobs',
+    subcategory: 'Knobs',
   },
   {
     title: 'Hooks',
     copy: 'Functional forms designed to live beautifully.',
     image:
       'https://images.unsplash.com/photo-1617104678098-de229db51175?auto=format&fit=crop&w=1200&q=85',
-    category: 'Hooks',
+    subcategory: 'Hooks',
   },
 ];
 
@@ -92,7 +92,7 @@ export default function Home({
         <div className="category-grid">
           {editorial.map((x) => (
             <Link
-              to={`/shop?category=${x.category}`}
+              to={`/shop?subcategory=${encodeURIComponent(x.subcategory)}`}
               className="category-card"
               key={x.title}
             >

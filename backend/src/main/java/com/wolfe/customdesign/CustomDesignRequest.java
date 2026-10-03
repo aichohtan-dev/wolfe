@@ -6,7 +6,7 @@ import java.time.Instant;
 @Entity
 @Table(name = "custom_design_requests") public class CustomDesignRequest {
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY) Long id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY) Long id; @Version long version;
     @Column(name = "customer_id", nullable = false) Long customerId;
     @Column(nullable = false) String projectName;
     @Column(length = 2000) String requirements;

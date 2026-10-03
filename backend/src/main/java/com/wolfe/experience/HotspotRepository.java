@@ -4,6 +4,12 @@ import java.util.*;
 import org.springframework.data.jpa.repository.*;
 
 public interface HotspotRepository extends JpaRepository<VisualHotspot, Long> {
-    @Query("SELECT h FROM VisualHotspot h WHERE h.visualContent.id = :visualContentId AND h.active = true ORDER BY h.id ASC")
+    @Query("SELECT h FROM VisualHotspot h WHERE h.visualContent.id = :visualContentId ORDER BY h.id ASC")
+    List<VisualHotspot> findByVisualContentIdAndOrderByIdAsc(@org.springframework.data.repository.query.Param("visualContentId") Long visualContentId);
+
+    @Query("SELECT h FROM VisualHotspot h WHERE h.visualContent.id = :visualContentId AND h.active = true AND h.visualContent.active = true ORDER BY h.id ASC")
     List<VisualHotspot> findByVisualContentIdAndActiveTrueOrderByIdAsc(@org.springframework.data.repository.query.Param("visualContentId") Long visualContentId);
+
+    @Query("SELECT h FROM VisualHotspot h WHERE h.visualContent.id = :visualContentId AND h.active = true AND h.visualContent.active = true ORDER BY h.id ASC")
+    List<VisualHotspot> findByActiveVisualContentId(@org.springframework.data.repository.query.Param("visualContentId") Long visualContentId);
 }

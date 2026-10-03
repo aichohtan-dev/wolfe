@@ -46,7 +46,7 @@ export default function Checkout({ cart, user, onPlaced }: CheckoutProps) {
         (i) => i.bundleSlug === slug && i.bundleId
       );
       const bundleQty = bundleLines.length
-        ? Math.min(...bundleLines.map((i) => i.qty))
+        ? Math.min(...bundleLines.map((i) => i.bundleUnits || 1))
         : 0;
       return sum + Number(q.discount || 0) * bundleQty;
     },
@@ -124,6 +124,7 @@ export default function Checkout({ cart, user, onPlaced }: CheckoutProps) {
     setBusy(true);
     setError('');
     try {
+      const idempotencyKey = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
       const order = await api.order({
         customerId: user.id,
         customerName: form.name,
@@ -143,7 +144,8 @@ export default function Checkout({ cart, user, onPlaced }: CheckoutProps) {
           variantId: i.variantId,
           variantSku: i.variantSku,
         })),
-      });
+      }, idempotencyKey);
+      try { await api.cart.clear(user.id); } catch { /* order is authoritative; local cart is cleared below */ }
       onPlaced(order);
       navigate(`/orders/${order.id}`);
     } catch (err: any) {

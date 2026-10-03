@@ -22,19 +22,19 @@ public class BrandController {
 
     @GetMapping("/brands/{slug}")
     public ResponseEntity<BrandResponse> getBySlug(@PathVariable String slug) {
-        return repo.findBySlug(slug)
+        return repo.findBySlug(slug).filter(Brand::isActive)
                 .map(b -> ResponseEntity.ok(BrandResponse.from(b)))
                 .orElse(ResponseEntity.notFound().build());
     }
 
     @GetMapping("/admin/brands")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
     public List<BrandResponse> listAdmin() {
         return repo.findAllByOrderBySortOrderAscNameAsc().stream().map(BrandResponse::from).toList();
     }
 
     @PostMapping("/admin/brands")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ResponseEntity<BrandResponse> create(@RequestBody BrandRequest req) {
         if (req == null || req.name() == null || req.name().isBlank()) {
             throw new IllegalArgumentException("Brand name is required");
@@ -46,7 +46,7 @@ public class BrandController {
     }
 
     @PutMapping("/admin/brands/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ResponseEntity<BrandResponse> update(@PathVariable Long id, @RequestBody BrandRequest req) {
         Brand brand = repo.findById(id).orElseThrow(() -> new IllegalArgumentException("Brand not found"));
         String name = req.name() != null && !req.name().isBlank() ? req.name().trim() : brand.getName();
@@ -56,7 +56,7 @@ public class BrandController {
     }
 
     @DeleteMapping("/admin/brands/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         if (!repo.existsById(id)) return ResponseEntity.notFound().build();
         repo.deleteById(id);

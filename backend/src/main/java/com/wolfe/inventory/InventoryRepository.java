@@ -11,6 +11,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 public interface InventoryRepository extends JpaRepository<Inventory, Long> {
     Optional<Inventory> findByProductId(Long productId);
+    @Query("select count(i) from Inventory i where (i.quantity - i.reserved) <= :threshold")
+    long countByAvailableLessThanEqual(@Param("threshold") int threshold);
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select i from Inventory i where i.productId = :productId")
     Optional<Inventory> findByProductIdForUpdate(@Param("productId") Long productId);

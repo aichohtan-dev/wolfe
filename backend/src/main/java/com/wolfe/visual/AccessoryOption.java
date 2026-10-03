@@ -9,6 +9,7 @@ import java.math.*;
 public class AccessoryOption {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY) private Long id;
+    @Version private long version;
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "product_id", nullable = false) private Product product;
     @Column(nullable = false, length = 120) private String name;
@@ -39,6 +40,7 @@ public class AccessoryOption {
     public Product getProduct() {
         return product;
     }
+    public Long getProductId() { return product.getId(); }
     public String getName() {
         return name;
     }

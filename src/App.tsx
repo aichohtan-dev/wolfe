@@ -70,33 +70,25 @@ function App() {
             return next;
         });
     };
-    const [user, setUser] = useState<Customer | null>(() => read('wolfe_user', null));
+    const [user, setUser] = useState<Customer | null>(() => localStorage.getItem('wolfe_storage_consent') === 'accepted' ? read('wolfe_user', null) : null);
     const [, setCatalogVersion] = useState(0);
 
     useEffect(() => {
-        api.products().then((server: any[]) => {
-            const mapped = server.filter(s => s.active !== false).map(s => ({
-                id: s.slug,
-                serverId: Number(s.id),
-                name: s.name,
-                category: s.category,
-                subcategory: s.subcategory,
-                brandName: s.brandName,
-                price: Number(s.price),
-                image: s.imageUrl || '/catalog/brass-01.jpg',
-                description: s.description || '',
-                finish: s.finish,
-                material: s.material || 'Metal',
-                color: s.color || 'Brass',
-                style: s.style || 'Modern',
-                dimensions: s.dimensions,
-                attributesJson: s.attributesJson,
-                featured: s.featured === true,
-                media: String(s.mediaUrls || '').split(/\r?\n|,/).map((x: string) => x.trim()).filter(Boolean)
-            }));
+        api.me().then(u => { void syncAccount(u); }).catch(() => { localStorage.removeItem('wolfe_user'); });
+    }, []);
+
+    useEffect(() => {
+        // Never expose bundled/demo catalog data as a production fallback.
+        products.splice(0, products.length);
+        activeProductSlugs = new Set();
+        setCatalogVersion(v => v + 1);
+        api.pagedProducts({ page: 0, pageSize: 24 }).then((paged: any) => {
+            const server = paged.content || [];
+            const mapped = server.filter((s: any) => s.active !== false).map(mapServerProduct);
             products.splice(0, products.length, ...mapped);
-            activeProductSlugs = new Set(mapped.map(p => p.id));
+            activeProductSlugs = new Set(mapped.map((p: any) => p.id));
             setCatalogVersion(v => v + 1);
+            void hydrateCartProducts(cart);
         }).catch(() => { });
     }, []);
 
@@ -107,13 +99,25 @@ function App() {
         for (const line of b.items || []) {
             const same = (x: CartItem) => x.id === line.slug && x.bundleId === Number(b.id) && !x.configurationToken;
             const found = next.find(same);
-            if (found)
-                found.qty += Number(line.quantity || 1);
-            else
-                next.push({ id: line.slug, qty: Number(line.quantity || 1), bundleId: Number(b.id), bundleSlug: b.slug });
+            if (found) {
+                const baseQuantity = found.bundleBaseQuantity || Number(line.quantity || 1);
+                const units = (found.bundleUnits || 1) + 1;
+                found.bundleBaseQuantity = baseQuantity;
+                found.bundleUnits = units;
+                found.qty = baseQuantity * units;
+            } else {
+                const baseQuantity = Number(line.quantity || 1);
+                next.push({ id: line.slug, qty: baseQuantity, bundleId: Number(b.id), bundleSlug: b.slug, bundleUnits: 1, bundleBaseQuantity: baseQuantity });
+            }
         }
         persistCart(next);
         setDrawer(true);
+        if (user) {
+            for (const line of b.items || []) {
+                const lineItem = next.find(x => x.id === line.slug && x.bundleId === Number(b.id) && !x.configurationToken);
+                if (lineItem) void api.cart.put(user.id, lineItem.id, lineItem.qty, lineItem.variantId, lineItem.bundleId).catch(() => {});
+            }
+        }
     };
 
     const [wishes, setWishes] = useState<string[]>(() => read('wolfe_wishlist', []));
@@ -132,21 +136,86 @@ function App() {
         write('wolfe_cart', v);
     };
 
+    const mapServerProduct = (s: any) => ({
+        id: s.slug,
+        serverId: Number(s.id),
+        name: s.name,
+        category: s.category,
+        subcategory: s.subcategory,
+        brandName: s.brandName,
+        price: Number(s.price),
+        image: s.imageUrl || '/catalog/brass-01.jpg',
+        description: s.description || '',
+        finish: s.finish,
+        material: s.material || 'Metal',
+        color: s.color || 'Brass',
+        style: s.style || 'Modern',
+        dimensions: s.dimensions,
+        attributesJson: s.attributesJson,
+        featured: s.featured === true,
+        media: String(s.mediaUrls || '').split(/\r?\n|,/).map((x: string) => x.trim()).filter(Boolean)
+    });
+
+    const hydrateCartProducts = async (items: CartItem[]) => {
+        const missing = [...new Set(items.map(x => x.id).filter(slug => !products.some(p => p.id === slug)))];
+        if (!missing.length) return;
+        const results = await Promise.allSettled(missing.map(slug => api.product(slug)));
+        const fetched = results.filter((r): r is PromiseFulfilledResult<any> => r.status === 'fulfilled').map(r => mapServerProduct(r.value));
+        if (fetched.length) {
+            products.splice(0, 0, ...fetched.filter(p => !products.some(x => x.id === p.id)));
+            activeProductSlugs = new Set([...products.map(p => p.id)]);
+            setCatalogVersion(v => v + 1);
+        }
+    };
+
     const syncAccount = async (u: Customer) => {
         setUser(u);
-        write('wolfe_user', u);
+        if (localStorage.getItem('wolfe_storage_consent') === 'accepted') write('wolfe_user', u);
         try {
-            const [serverCart, serverWishes] = await Promise.all([api.cart.get(u.id), api.wishlist.get(u.id).catch(() => [])]);
-            const mapped = serverCart.map((x: any) => {
-                const p = products.find(p => p.serverId === x.productId);
-                return p ? { id: p.id, qty: x.quantity } : null;
-            }).filter(Boolean) as CartItem[];
-            const localSpecial = cart.filter(x => !!x.configurationToken || x.bundleId || x.variantId);
-            const merged = [...mapped, ...localSpecial];
-            if (merged.length || serverCart.length === 0)
-                persistCart(merged);
-            setWishes(serverWishes);
-            write('wolfe_wishlist', serverWishes);
+            const [serverCart, serverWishes] = await Promise.all([api.cart.get(u.id), api.wishlist.get(u.id).catch(() => [] as string[])]);
+            const mapped = serverCart.map((x: any) => ({
+                id: x.slug,
+                qty: x.quantity,
+                bundleId: x.bundleId ?? undefined,
+                bundleSlug: x.bundleSlug ?? undefined,
+                bundleUnits: x.bundleUnits ?? undefined,
+                bundleBaseQuantity: x.bundleBaseQuantity ?? undefined,
+                configurationToken: x.configurationToken ?? undefined,
+                variantId: x.variantId ?? undefined,
+                variantSku: x.variantSku ?? undefined,
+                variantTitle: x.variantTitle ?? undefined,
+                variantColor: x.variantColor ?? undefined,
+                variantMaterial: x.variantMaterial ?? undefined,
+                variantSize: x.variantSize ?? undefined,
+                variantFinish: x.variantFinish ?? undefined,
+                variantImage: x.variantImage ?? undefined,
+                variantPrice: x.variantPrice ?? undefined
+            })).filter((x: any) => !!x.id) as CartItem[];
+            const key = (x: any) => `${x.id}|${x.variantId ?? ''}|${x.configurationToken ?? ''}|${x.bundleId ?? ''}`;
+            const byKey = new Map(mapped.map((x: CartItem) => [key(x), x]));
+            for (const local of cart) {
+                const k = key(local);
+                const server = byKey.get(k);
+                if (!server) byKey.set(k, local);
+                else if (local.qty > server.qty) {
+                    server.qty = local.qty;
+                    server.bundleUnits = local.bundleUnits;
+                    server.bundleBaseQuantity = local.bundleBaseQuantity;
+                }
+            }
+            const merged = [...byKey.values()];
+            persistCart(merged);
+            await hydrateCartProducts(merged);
+            for (const item of merged) {
+                void api.cart.put(u.id, item.id, item.qty, item.variantId, item.bundleId, item.configurationToken).catch(() => {});
+            }
+            const localWishes = read('wolfe_wishlist', []) as string[];
+            const mergedWishes = [...new Set([...serverWishes, ...localWishes])];
+            for (const slug of mergedWishes) {
+                if (!serverWishes.includes(slug)) void api.wishlist.add(u.id, slug).catch(() => {});
+            }
+            setWishes(mergedWishes);
+            write('wolfe_wishlist', mergedWishes);
         } catch { }
     };
 
@@ -182,10 +251,10 @@ function App() {
         persistCart(next);
         setDrawer(true);
 
-        if (user && !variant) {
+        if (user) {
             const item = next.find(same)!;
             try {
-                await api.cart.put(user.id, id, item.qty);
+                await api.cart.put(user.id, id, item.qty, variant?.id, item.bundleId, item.configurationToken);
             } catch { }
         }
     };
@@ -196,6 +265,10 @@ function App() {
             : [...cart, { id, qty: 1, configurationToken }];
         persistCart(next);
         setDrawer(true);
+        if (user) {
+            const item = next.find(x => x.id === id && x.configurationToken === configurationToken);
+            if (item) void api.cart.put(user.id, id, item.qty, item.variantId, item.bundleId, configurationToken).catch(() => {});
+        }
     };
 
     const qty = async (
@@ -214,17 +287,33 @@ function App() {
         const next = bundleId
             ? n < 1
                 ? cart.filter(x => x.bundleId !== bundleId)
-                : cart.map(x => (x.bundleId === bundleId ? { ...x, qty: n } : x))
+                : cart.map(x => x.bundleId === bundleId
+                    ? { ...x, bundleUnits: n, qty: (x.bundleBaseQuantity || x.qty) * n }
+                    : x)
             : n < 1
             ? cart.filter(x => !same(x))
             : cart.map(x => (same(x) ? { ...x, qty: n } : x));
 
         persistCart(next);
 
-        if (user && !configurationToken && !bundleId && !variantId) {
+        if (user) {
             try {
-                if (n < 1) await api.cart.remove(user.id, id);
-                else await api.cart.put(user.id, id, n);
+                if (bundleId) {
+                    const bundleLines = next.filter(x => x.bundleId === bundleId);
+                    if (n < 1) {
+                        for (const line of cart.filter(x => x.bundleId === bundleId)) {
+                            await api.cart.remove(user.id, line.id, line.variantId, line.bundleId, line.configurationToken);
+                        }
+                    } else {
+                        for (const line of bundleLines) {
+                            await api.cart.put(user.id, line.id, line.qty, line.variantId, line.bundleId, line.configurationToken);
+                        }
+                    }
+                } else if (n < 1) {
+                    await api.cart.remove(user.id, id, variantId, undefined, configurationToken);
+                } else {
+                    await api.cart.put(user.id, id, n, variantId, undefined, configurationToken);
+                }
             } catch { }
         }
     };
@@ -283,7 +372,7 @@ function App() {
                 <Route path="/orders" element={<Orders user={user} />} />
                 <Route path="/notifications" element={<NotificationsPage user={user} />} />
                 <Route path="/orders/:id" element={<OrderDetail user={user} />} />
-                <Route path="/profile" element={<ProfilePage user={user} onSaved={u => { setUser(u); write('wolfe_user', u); }} />} />
+                <Route path="/profile" element={<ProfilePage user={user} onSaved={u => { setUser(u); if (localStorage.getItem('wolfe_storage_consent') === 'accepted') write('wolfe_user', u); }} />} />
                 <Route path="/addresses" element={<AddressesPage user={user} />} />
                 <Route path="/consultation" element={<Consultation />} />
                 <Route path="/quote" element={<QuoteRequest user={user} />} />

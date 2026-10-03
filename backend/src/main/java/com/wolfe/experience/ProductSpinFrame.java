@@ -25,10 +25,15 @@ public class ProductSpinFrame {
     public Product getProduct() {
         return product;
     }
+    public Long getProductId() { return product.getId(); }
     public String getImageUrl() {
         return imageUrl;
     }
     public int getSortOrder() {
         return sortOrder;
+    }
+    public void update(String imageUrl, int sortOrder) {
+        this.imageUrl = imageUrl.trim();
+        this.sortOrder = sortOrder;
     }
 }

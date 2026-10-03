@@ -18,6 +18,10 @@ public class NotificationService {
         ' ').toLowerCase()+".", "ORDER",
         orderId));
     }
+    public CustomerNotification refundUpdate(Long customerId, String orderId, long amount) {
+        return repo.save(new CustomerNotification(customerId, "REFUND_UPDATE", "Refund processed",
+                "Your refund of ₹" + String.format(java.util.Locale.ROOT, "%.2f", amount / 100.0) + " has been processed for order " + orderId + ".", "ORDER", orderId));
+    }
     public CustomerNotification cartRecovery(Long customerId) {
         return repo.save(new CustomerNotification(customerId, "CART_RECOVERY", "Your Wolfe selection is waiting",
         "Your saved cart is still waiting for you. Revisit your selection when you are ready.", "CART",

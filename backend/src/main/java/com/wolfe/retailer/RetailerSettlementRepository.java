@@ -13,7 +13,13 @@ import java.util.Optional;
 @Repository
 public interface RetailerSettlementRepository extends JpaRepository<RetailerSettlement, Long> {
     Optional<RetailerSettlement> findByOrderId(String orderId);
-    Optional<RetailerSettlement> findByOrderIdAndRetailerId(String orderId, Long retailerId);
+    Optional<RetailerSettlement> findTopByOrderIdAndRetailerIdOrderByIdDesc(String orderId, Long retailerId);
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @org.springframework.data.jpa.repository.Query("select s from RetailerSettlement s where s.orderId = :orderId and s.retailerId = :retailerId order by s.id desc")
+    List<RetailerSettlement> findByOrderIdAndRetailerIdForUpdateRows(@org.springframework.data.repository.query.Param("orderId") String orderId, @org.springframework.data.repository.query.Param("retailerId") Long retailerId);
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @org.springframework.data.jpa.repository.Query("select s from RetailerSettlement s where s.id = :id")
+    Optional<RetailerSettlement> findByIdForUpdate(@org.springframework.data.repository.query.Param("id") Long id);
     List<RetailerSettlement> findByRetailerId(Long retailerId);
     Page<RetailerSettlement> findByRetailerId(Long retailerId, Pageable pageable);
     List<RetailerSettlement> findByRetailerIdAndStatus(Long retailerId, String status);

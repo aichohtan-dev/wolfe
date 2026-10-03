@@ -7,8 +7,7 @@ import com.wolfe.order.OrderItem;
 import com.wolfe.order.OrderItemRepository;
 import com.wolfe.order.OrderRepository;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.*;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -59,30 +58,15 @@ public class RetailerController {
     }
 
     private Retailer getAuthenticatedRetailer(Authentication auth) {
-        if (auth == null || auth.getDetails() == null) {
+        if (auth == null || auth.getDetails() == null
+                || auth.getAuthorities().stream().noneMatch(a -> "ROLE_RETAILER".equals(a.getAuthority()))) {
             throw new AccessDeniedException("Authentication required");
         }
         Long customerId = (Long) auth.getDetails();
-
-        // 1. Try find by userId
-        Optional<Retailer> ret = retailerRepo.findByUserId(customerId);
-        if (ret.isPresent()) return ret.get();
-
-        // 2. Try find by email
-        Customer c = customerRepo.findById(customerId).orElse(null);
-        if (c != null) {
-            Optional<Retailer> byEmail = retailerRepo.findByEmail(c.getEmail());
-            if (byEmail.isPresent()) return byEmail.get();
-        }
-
-        // 3. If admin role, allow fallback to first active retailer for demo/dashboard
-        boolean isAdmin = auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().contains("ADMIN"));
-        if (isAdmin) {
-            return retailerRepo.findAll().stream().findFirst()
-                    .orElseThrow(() -> new AccessDeniedException("No retailer partner configured"));
-        }
-
-        throw new AccessDeniedException("No retailer partner linked to this account");
+        Retailer r = retailerRepo.findByUserId(customerId)
+                .orElseThrow(() -> new AccessDeniedException("No retailer partner linked to this account"));
+        if (!r.isActive()) throw new AccessDeniedException("Retailer account is not active or verified");
+        return r;
     }
 
     @GetMapping("/me")
@@ -93,8 +77,13 @@ public class RetailerController {
         List<RetailerSettlement> settlements = settlementRepo.findByRetailerId(r.getId());
 
         long totalEarned = settlements.stream()
-                .filter(s -> "SETTLED".equals(s.getStatus()) || "ELIGIBLE".equals(s.getStatus()))
-                .mapToLong(RetailerSettlement::getRetailerPayableAmount)
+                .mapToLong(s -> {
+                    if ("SETTLED".equalsIgnoreCase(s.getStatus())) return s.getSettledAmount();
+                    if ("ELIGIBLE".equalsIgnoreCase(s.getStatus())) {
+                        return Math.max(0L, s.getRetailerPayableAmount() - s.getAdjustmentAmount());
+                    }
+                    return 0L;
+                })
                 .sum();
 
         return Map.of(
@@ -111,7 +100,9 @@ public class RetailerController {
     @GetMapping("/orders")
     public List<Map<String, Object>> getAssignedOrders(Authentication auth) {
         Retailer r = getAuthenticatedRetailer(auth);
-        List<RetailerOrderAssignment> assignments = assignmentRepo.findByRetailerId(r.getId());
+        List<RetailerOrderAssignment> assignments = assignmentRepo.findByRetailerIdAndStatus(r.getId(), "ASSIGNED");
+        assignments.addAll(assignmentRepo.findByRetailerIdAndStatus(r.getId(), "ACCEPTED"));
+        assignments = assignments.stream().filter(a -> Set.of("ASSIGNED", "ACCEPTED").contains(a.getStatus().toUpperCase())).toList();
 
         List<Map<String, Object>> result = new ArrayList<>();
         for (RetailerOrderAssignment assign : assignments) {
@@ -119,8 +110,8 @@ public class RetailerController {
             if (order == null) continue;
 
             List<OrderItem> items = orderItemRepo.findByOrderId(order.getId());
-            Fulfillment fulfillment = fulfillmentRepo.findByOrderIdAndRetailerId(order.getId(), r.getId()).orElse(null);
-            RetailerSettlement settlement = settlementRepo.findByOrderIdAndRetailerId(order.getId(), r.getId()).orElse(null);
+            Fulfillment fulfillment = fulfillmentRepo.findTopByOrderIdAndRetailerIdOrderByIdDesc(order.getId(), r.getId()).orElse(null);
+            RetailerSettlement settlement = settlementRepo.findTopByOrderIdAndRetailerIdOrderByIdDesc(order.getId(), r.getId()).orElse(null);
 
             result.add(Map.of(
                     "assignment", assign,
@@ -153,10 +144,10 @@ public class RetailerController {
         return Map.of("success", true, "orderId", orderId, "status", "ACCEPTED");
     }
 
-    public record PackRequest(String trackingNumber, String courierName) {}
+    public record PackRequest(@Size(max = 100) String trackingNumber, @Size(max = 100) String courierName) {}
 
     @PostMapping("/orders/{orderId}/pack")
-    public Map<String, Object> packOrder(@PathVariable String orderId, @RequestBody(required = false) PackRequest req, Authentication auth) {
+    public Map<String, Object> packOrder(@PathVariable String orderId, @Valid @RequestBody(required = false) PackRequest req, Authentication auth) {
         Retailer r = getAuthenticatedRetailer(auth);
         String tracking = req != null ? req.trackingNumber() : null;
         String courier = req != null ? req.courierName() : null;
@@ -172,7 +163,7 @@ public class RetailerController {
     }
 
     @PostMapping("/orders/{orderId}/out-for-delivery")
-    public Map<String, Object> outForDelivery(@PathVariable String orderId, @RequestBody(required = false) PackRequest req, Authentication auth) {
+    public Map<String, Object> outForDelivery(@PathVariable String orderId, @Valid @RequestBody(required = false) PackRequest req, Authentication auth) {
         Retailer r = getAuthenticatedRetailer(auth);
         String tracking = req != null ? req.trackingNumber() : null;
         allocationService.outForDelivery(orderId, r.getId(), tracking);
@@ -203,10 +194,10 @@ public class RetailerController {
             Authentication auth
     ) {
         Retailer r = getAuthenticatedRetailer(auth);
-        return inventoryRepo.searchByRetailer(r.getId(), query, PageRequest.of(page, size, Sort.by("id").ascending()));
+        return inventoryRepo.searchByRetailer(r.getId(), query, PageRequest.of(Math.max(0, page), Math.min(Math.max(1, size), 100), Sort.by("id").ascending()));
     }
 
-    public record AdjustStockRequest(@NotBlank String sku, @NotNull Integer newPhysicalStock, String reason) {}
+    public record AdjustStockRequest(@NotBlank @Size(max = 100) String sku, @NotNull @Min(0) Integer newPhysicalStock, @Size(max = 500) String reason) {}
 
     @PostMapping("/inventory/adjust")
     public RetailerInventory adjustStock(@Valid @RequestBody AdjustStockRequest req, Authentication auth) {
@@ -222,7 +213,7 @@ public class RetailerController {
             Authentication auth
     ) {
         Retailer r = getAuthenticatedRetailer(auth);
-        return movementRepo.findByRetailerIdOrderByCreatedAtDesc(r.getId(), PageRequest.of(page, size));
+        return movementRepo.findByRetailerIdOrderByCreatedAtDesc(r.getId(), PageRequest.of(Math.max(0, page), Math.min(Math.max(1, size), 100)));
     }
 
     @GetMapping("/settlements")
@@ -233,6 +224,6 @@ public class RetailerController {
             Authentication auth
     ) {
         Retailer r = getAuthenticatedRetailer(auth);
-        return settlementRepo.searchSettlements(r.getId(), status, PageRequest.of(page, size));
+        return settlementRepo.searchSettlements(r.getId(), status, PageRequest.of(Math.max(0, page), Math.min(Math.max(1, size), 100)));
     }
 }

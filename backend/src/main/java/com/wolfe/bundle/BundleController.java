@@ -20,16 +20,18 @@ public class BundleController {
         this.products = products;
     }
     @GetMapping public List<Map<String, Object>> list() {
-        return bundles.findAll().stream().filter(Bundle::isActive).map(this::view).toList();
+        return bundles.findAll(org.springframework.data.domain.PageRequest.of(0, 100, org.springframework.data.domain.Sort.by("id").ascending())).stream().filter(Bundle::isActive).map(this::view).filter(Objects::nonNull).toList();
     }
     @GetMapping("/{slug}") public Map<String, Object> get(@PathVariable String slug) {
-        return view(bundles.findBySlug(slug).filter(Bundle::isActive).orElseThrow(() -> new NoSuchElementException("Bundle not found")));
+        Map<String, Object> result = view(bundles.findBySlug(slug).filter(Bundle::isActive).orElseThrow(() -> new NoSuchElementException("Bundle not found")));
+        if (result == null) throw new NoSuchElementException("Bundle not found");
+        return result;
     }
     private Map<String, Object> view(Bundle b) {
         var lines = items.findByBundleId(b.getId()).stream().map(i -> products.findById(i.getProductId()).filter(Product::isActive).map(p -> Map.<String,
         Object>of("productId", p.getId(), "slug", p.getSlug(), "name", p.getName(), "price", p.getPrice(), "quantity", i.getQuantity(), "imageUrl",
-        p.getImageUrl())).orElse(null)).filter(Objects::nonNull).toList();
-        if (lines.isEmpty()) throw new IllegalArgumentException("bundle has no active products");
+        p.getImageUrl() == null ? "" : p.getImageUrl())).orElse(null)).filter(Objects::nonNull).toList();
+        if (lines.isEmpty()) return null;
         BigDecimal subtotal = lines.stream().map(x -> ((BigDecimal)x.get("price")).multiply(BigDecimal.valueOf((Integer)x.get("quantity")))).reduce(BigDecimal.ZERO,
         BigDecimal::add);
         BigDecimal discount = b.getDiscountType().equals("FIXED")?b.getDiscountValue():subtotal.multiply(b.getDiscountValue()).divide(BigDecimal.valueOf(100),

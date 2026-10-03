@@ -1,0 +1,3 @@
+-- Historical migration V14 is intentionally absent from the shipped artifact.
+-- Do not recreate V14 retroactively: existing databases may already have later versions applied.
+-- This forward-only marker preserves the documented history without triggering Flyway out-of-order execution.

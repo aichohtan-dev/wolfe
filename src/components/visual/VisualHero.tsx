@@ -1,6 +1,16 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../api';
 
+function safeLink(value: unknown): string | null {
+  if (typeof value !== 'string' || !value.trim()) return null;
+  const raw = value.trim();
+  if (raw.startsWith('/')) return raw;
+  try {
+    const url = new URL(raw, window.location.origin);
+    return ['http:', 'https:'].includes(url.protocol) ? url.toString() : null;
+  } catch { return null; }
+}
+
 export function VisualHero() {
   const [items, setItems] = useState<any[]>([]);
   const [index, setIndex] = useState(0);
@@ -25,7 +35,7 @@ export function VisualHero() {
         <p className="eyebrow">Wolfe visual story</p>
         <h2>{x.title}</h2>
         {x.subtitle && <p>{x.subtitle}</p>}
-        {x.linkUrl && <a className="btn btn-orange" href={x.linkUrl}>Explore</a>}
+        {safeLink(x.linkUrl) && <a className="btn btn-orange" href={safeLink(x.linkUrl) as string} rel="noopener noreferrer">Explore</a>}
       </div>
       {items.length > 1 && (
         <div className="visual-hero-dots">

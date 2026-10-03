@@ -10,6 +10,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Collection;
 import java.util.Optional;
 
 @Repository
@@ -18,6 +19,8 @@ public interface RetailerInventoryRepository extends JpaRepository<RetailerInven
     Page<RetailerInventory> findByRetailerId(Long retailerId, Pageable pageable);
 
     Optional<RetailerInventory> findByRetailerIdAndSku(Long retailerId, String sku);
+
+    List<RetailerInventory> findByRetailerIdAndSkuIn(Long retailerId, Collection<String> skus);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("SELECT i FROM RetailerInventory i WHERE i.retailerId = :retailerId AND i.sku = :sku")

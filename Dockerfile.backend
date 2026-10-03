@@ -1,14 +1,16 @@
-FROM eclipse-temurin:21-jdk-alpine AS build
+FROM eclipse-temurin@sha256:6ea5548706b60ac0a602eaf48af74792cbab012d90e811ca8db6184b16b5c3d6 AS build
 WORKDIR /app
 RUN apk add --no-cache curl unzip
 COPY backend/.mvn .mvn
 COPY backend/mvnw backend/mvnw.cmd backend/pom.xml ./
 COPY backend/src src
-RUN chmod +x mvnw && ./mvnw -q -DskipTests package
+RUN chmod +x mvnw && ./mvnw -q -Pdocker test && ./mvnw -q -Pdocker package -DskipTests=false
 
-FROM eclipse-temurin:21-jre-alpine
+FROM eclipse-temurin:21-jre-alpine@sha256:1a29e1fe337eb28b5bec30f0ee8ed29f0ff80ab6f75dcf9313efe82911065a52
 WORKDIR /app
-RUN addgroup -S wolfe && adduser -S wolfe -G wolfe
+RUN addgroup -S wolfe && adduser -S wolfe -G wolfe \
+    && mkdir -p /app/public/catalog/imports /app/public/catalog/published \
+    && chown -R wolfe:wolfe /app/public
 COPY --from=build /app/target/wolfe-api-0.1.0.jar app.jar
 USER wolfe
 EXPOSE 8080

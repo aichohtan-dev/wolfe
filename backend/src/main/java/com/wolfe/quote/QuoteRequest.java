@@ -6,7 +6,7 @@ import java.time.Instant;
 @Entity
 @Table(name = "quote_requests") public class QuoteRequest {
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY) Long id;
+    @GeneratedValue(strategy = GenerationType.IDENTITY) Long id; @Version long version;
     @Column(name = "customer_id", nullable = false) Long customerId;
     @Column(name = "product_id") Long productId;
     @Column(name = "configuration_id") Long configurationId;

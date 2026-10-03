@@ -8,6 +8,7 @@ import jakarta.persistence.*;
 public class ProductMedia {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY) private Long id;
+    @Version private long version;
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "product_id", nullable = false) private Product product;
     @Column(nullable = false, length = 20) private String type;
@@ -46,6 +47,8 @@ public class ProductMedia {
     public boolean isActive() {
         return active;
     }
+    public void deactivate() { this.active = false; }
+
     public void update(String type, String url, String altText, int sortOrder, boolean active) {
         this.type = type;
         this.url = url;

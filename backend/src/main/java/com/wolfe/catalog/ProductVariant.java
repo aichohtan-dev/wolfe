@@ -14,6 +14,10 @@ public class ProductVariant {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Version
+    @Column(nullable = false)
+    private long version;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "product_id", nullable = false)
     private Product product;
@@ -27,7 +31,7 @@ public class ProductVariant {
     @Column(length = 200)
     private String title;
 
-    @Column(length = 120, unique = true)
+    @Column(nullable = false, length = 120, unique = true)
     private String sku;
 
     @Column(length = 100)

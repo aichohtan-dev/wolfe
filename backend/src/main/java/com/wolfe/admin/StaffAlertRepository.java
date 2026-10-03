@@ -1,0 +1,1 @@
+package com.wolfe.admin; import java.util.*; import org.springframework.data.domain.*; import org.springframework.data.jpa.repository.JpaRepository; public interface StaffAlertRepository extends JpaRepository<StaffAlert,Long>{ Page<StaffAlert> findByAcknowledgedFalseOrderByCreatedAtDesc(Pageable pageable); }

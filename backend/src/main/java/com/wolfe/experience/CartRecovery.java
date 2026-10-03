@@ -10,6 +10,7 @@ public class CartRecovery {
     @Column(nullable = false) private Instant lastActivity = Instant.now();
     @Column(nullable = false) private boolean reminderSent = false;
     @Column(length = 1000) private String recoveryToken;
+    @Column(name = "reminder_claimed_at") private Instant reminderClaimedAt;
     protected CartRecovery() {
     }
     public CartRecovery(Long customerId) {
@@ -24,9 +25,9 @@ public class CartRecovery {
     public boolean isReminderSent() {
         return reminderSent;
     }
-    public String getRecoveryToken() {
-        return recoveryToken;
-    }
+    public String getRecoveryToken() { return recoveryToken; }
+    public java.time.Instant getReminderClaimedAt() { return reminderClaimedAt; }
+    public void claimReminder(java.time.Instant now) { reminderClaimedAt = now; }
     public void touch() {
         lastActivity = Instant.now();
         reminderSent = false;

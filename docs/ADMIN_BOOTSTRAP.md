@@ -24,7 +24,7 @@ FROM customers
 WHERE lower(email) = lower('admin@example.com');
 ```
 
-6. Log in again so a fresh JWT contains the updated role claim.
+6. Log in again so the application observes the updated database role for the new session. The API authorization layer resolves the current role from the database; the JWT is not the authoritative role source.
 7. Verify `/api/v1/admin/**` is accessible with the new admin session and returns `403`/`401` for a normal customer session.
 
 ## Operational rules

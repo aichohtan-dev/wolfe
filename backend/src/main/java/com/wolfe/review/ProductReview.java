@@ -46,6 +46,7 @@ public class ProductReview {
     public Instant getCreatedAt() {
         return createdAt;
     }
+    public void updateContent(int r, String t) { this.rating=r; this.review=t; this.status="PENDING"; }
     public void moderate(String s) {
         status = s;
     }

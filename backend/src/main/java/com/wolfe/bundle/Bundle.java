@@ -8,6 +8,7 @@ import java.math.BigDecimal;
 public class Bundle {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY) private Long id;
+    @Version private long version;
     @Column(nullable = false, unique = true, length = 120) private String slug;
     @Column(nullable = false, length = 200) private String name;
     @Column(length = 1000) private String description;

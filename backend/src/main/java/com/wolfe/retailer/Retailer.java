@@ -11,6 +11,9 @@ public class Retailer {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Version
+    private long version;
+
     @Column(nullable = false, length = 200)
     private String name;
 
@@ -37,6 +40,9 @@ public class Retailer {
 
     @Column(name = "delivery_radius_km", nullable = false)
     private BigDecimal deliveryRadiusKm = new BigDecimal("25.0");
+
+    @Column(precision = 9, scale = 6) private BigDecimal latitude;
+    @Column(precision = 9, scale = 6) private BigDecimal longitude;
 
     @Column(nullable = false, length = 50)
     private String status = "ACTIVE"; // PENDING, ACTIVE, SUSPENDED, INACTIVE
@@ -106,6 +112,13 @@ public class Retailer {
 
     public BigDecimal getDeliveryRadiusKm() { return deliveryRadiusKm; }
     public void setDeliveryRadiusKm(BigDecimal deliveryRadiusKm) { this.deliveryRadiusKm = deliveryRadiusKm; touch(); }
+    public BigDecimal getLatitude() { return latitude; }
+    public BigDecimal getLongitude() { return longitude; }
+    public void setCoordinates(BigDecimal latitude, BigDecimal longitude) {
+        if (latitude != null && (latitude.compareTo(new BigDecimal("-90")) < 0 || latitude.compareTo(new BigDecimal("90")) > 0)) throw new IllegalArgumentException("invalid retailer latitude");
+        if (longitude != null && (longitude.compareTo(new BigDecimal("-180")) < 0 || longitude.compareTo(new BigDecimal("180")) > 0)) throw new IllegalArgumentException("invalid retailer longitude");
+        this.latitude = latitude; this.longitude = longitude; touch();
+    }
 
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; touch(); }
@@ -120,7 +133,14 @@ public class Retailer {
     public void setRating(BigDecimal rating) { this.rating = rating; touch(); }
 
     public BigDecimal getCommissionRate() { return commissionRate; }
-    public void setCommissionRate(BigDecimal commissionRate) { this.commissionRate = commissionRate; touch(); }
+    public void setCommissionRate(BigDecimal commissionRate) {
+        if (commissionRate == null) throw new IllegalArgumentException("commission rate is required");
+        if (commissionRate.signum() < 0 || commissionRate.compareTo(new BigDecimal("100")) > 0) {
+            throw new IllegalArgumentException("commission rate must be between 0 and 100 percent");
+        }
+        this.commissionRate = commissionRate;
+        touch();
+    }
 
     public Long getUserId() { return userId; }
     public void setUserId(Long userId) { this.userId = userId; touch(); }

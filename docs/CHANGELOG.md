@@ -1,3 +1,7 @@
+## V46 — Security hardening
+- History-safe retailer fulfillment reassignment and generic registration response.
+- Secure-by-default cookies, HSTS edge header, Node toolchain pin, PDFBox 3.0.8.
+
 # Wolfe — Project Changelog
 
 This document consolidates all historical release changelogs, status checkpoints, and architectural audit notes for the Wolfe Luxury Furniture commerce platform.

@@ -1,4 +1,4 @@
-# Wolfe Production Configuration Audit — V18.12
+# Wolfe Production Configuration Audit — V49 / Zero-Gap
 
 ## Scope
 .env.example, Dockerfiles, docker-compose, Nginx, CORS, security headers, secret/config handling, Flyway migrations, and GitHub Actions CI.
@@ -14,7 +14,7 @@
 - Nginx: added CSP, Permissions-Policy, X-Content-Type-Options, X-Frame-Options and Referrer-Policy.
 - CORS: remains explicit and environment-driven through `WOLFE_FRONTEND_ORIGIN`; production Compose requires the value instead of silently defaulting it.
 - Flyway: versions 1–13 and 15–23 are unique; there are no duplicate migration versions. Version 14 is absent, which is valid Flyway numbering unless a previously released V14 is expected by an external deployment.
-- CI: frontend and backend jobs remain separated; Maven cache remains enabled. npm lockfile is currently absent, so CI uses `npm install` rather than claiming `npm ci` reproducibility.
+- CI: frontend and backend jobs remain separated; Maven cache remains enabled. The repository contains `package-lock.json`, and CI uses `npm ci --ignore-scripts` for reproducible frontend dependency installation.
 
 ## TLS and Network Architecture
 
@@ -37,3 +37,11 @@
 - Docker image builds and live compose testing require an active Docker engine and network access on target hosts.
 - Full Maven/Node runtime builds are certified in CI and locally where dependencies are cached.
 - No real production secrets are inserted into repository files.
+
+
+## V46 Security Requirements
+
+- `WOLFE_SECURE_COOKIES` defaults to `true`; set it to `false` only for explicit local HTTP development.
+- HSTS is intentionally emitted by the TLS-terminating application/edge layer; the container Nginx listener is HTTP-only and does not emit HSTS.
+- Retailer fulfillment rows are historical records; reassignment creates a new row and the active-order partial unique index prevents two active fulfillments.
+- Registration uses a generic 202 response for both new and existing emails and performs BCrypt work on duplicate probes to reduce account-enumeration timing differences.

@@ -52,9 +52,13 @@ export default function ProductModal({
   const [form, setForm] = useState<any>(blankProduct);
   const [variants, setVariants] = useState<any[]>([]);
   const [media, setMedia] = useState<any[]>([]);
+  const [accessories, setAccessories] = useState<any[]>([]);
+  const [mediaDraft, setMediaDraft] = useState<any>({ type: 'IMAGE', url: '', altText: '', sortOrder: 0 });
+  const [accessoryDraft, setAccessoryDraft] = useState<any>({ name: '', type: 'HANDLE', overlayUrl: '', sku: '', price: '', x: 50, y: 50, scale: 1 });
   const [saving, setSaving] = useState(false);
   const [attributes, setAttributes] = useState<Record<string, string>>({});
 
+  const [editingVariantId, setEditingVariantId] = useState<number | null>(null);
   const [variantDraft, setVariantDraft] = useState<any>({
     title: '',
     sku: '',
@@ -117,10 +121,8 @@ export default function ProductModal({
         .variants(editing.id)
         .then(setVariants)
         .catch(() => setVariants([]));
-      api.admin
-        .media(editing.id)
-        .then(setMedia)
-        .catch(() => setMedia([]));
+      api.admin.media(editing.id).then(setMedia).catch(() => setMedia([]));
+      api.admin.accessories(editing.id).then(setAccessories).catch(() => setAccessories([]));
     } else {
       setAttributes({});
       setForm({
@@ -129,6 +131,7 @@ export default function ProductModal({
       });
       setVariants([]);
       setMedia([]);
+      setAccessories([]);
     }
   }, [isOpen, editing, adminProductsLength]);
 
@@ -209,6 +212,56 @@ export default function ProductModal({
     } catch (err: any) {
       onError(err.message || 'Could not create variant');
     }
+  };
+
+  const handleEditVariant = (v: any) => {
+    setEditingVariantId(v.id);
+    setVariantDraft({ title:v.title || v.optionValue || '', sku:v.sku || '', color:v.color || '', material:v.material || '', size:v.size || '', finish:v.finish || '', dimensions:v.dimensions || '', priceOverride:v.priceOverride ?? '', stockQuantity:v.stockQuantity ?? 0, imageUrl:v.imageUrl || '' });
+  };
+
+  const handleSaveVariant = async () => {
+    if (!editing || !editingVariantId || !variantDraft.sku.trim()) { onError('Variant SKU is required'); return; }
+    const payload = { optionName:variantDraft.color ? 'Color / Size' : 'Variant', optionValue:variantDraft.title || `${variantDraft.color} ${variantDraft.size}`, title:variantDraft.title || `${variantDraft.color} ${variantDraft.size}`, sku:variantDraft.sku.trim().toUpperCase(), color:variantDraft.color, material:variantDraft.material, size:variantDraft.size, finish:variantDraft.finish, dimensions:variantDraft.dimensions, priceOverride:variantDraft.priceOverride === '' ? null : Number(variantDraft.priceOverride), stockQuantity:Number(variantDraft.stockQuantity || 0), imageUrl:variantDraft.imageUrl || form.imageUrl, active:true };
+    try { const updated=await api.admin.updateVariant(editing.id,editingVariantId,payload); setVariants(variants.map(v=>v.id===editingVariantId?updated:v)); setEditingVariantId(null); } catch(err:any){ onError(err.message || 'Could not update variant'); }
+  };
+
+  const saveMedia = async () => {
+    if (!editing || !mediaDraft.url.trim()) return;
+    try {
+      const created = await api.admin.createMedia(editing.id, { ...mediaDraft, url: mediaDraft.url.trim(), sortOrder: Number(mediaDraft.sortOrder || 0), active: true });
+      setMedia([...media, created]); setMediaDraft({ type: 'IMAGE', url: '', altText: '', sortOrder: media.length });
+    } catch (err:any) { onError(err.message || 'Could not create media'); }
+  };
+  const editMedia = async (item:any) => {
+    if (!editing) return;
+    const url=window.prompt('Media URL', item.url); if (!url?.trim()) return;
+    const type=window.prompt('Type (IMAGE/VIDEO/360)', item.type) || item.type;
+    const altText=(window.prompt('Alt text', item.altText || '') ?? item.altText) || '';
+    try { const updated=await api.admin.updateMedia(editing.id,item.id,{type,url:url.trim(),altText,sortOrder:item.sortOrder,active:item.active}); setMedia(media.map(m=>m.id===item.id?updated:m)); }
+    catch(err:any){ onError(err.message || 'Could not update media'); }
+  };
+  const deleteMedia = async (mediaId:number) => {
+    if (!editing) return;
+    try { await api.admin.deleteMedia(editing.id, mediaId); setMedia(media.filter(m=>m.id!==mediaId)); }
+    catch(err:any){ onError(err.message || 'Could not delete media'); }
+  };
+  const saveAccessory = async () => {
+    if (!editing || !accessoryDraft.name.trim() || !accessoryDraft.overlayUrl.trim()) return;
+    const body={...accessoryDraft,name:accessoryDraft.name.trim(),overlayUrl:accessoryDraft.overlayUrl.trim(),price:accessoryDraft.price===''?null:Number(accessoryDraft.price),x:Number(accessoryDraft.x||50),y:Number(accessoryDraft.y||50),scale:Number(accessoryDraft.scale||1),active:true};
+    try { const created=await api.admin.createAccessory(editing.id,body); setAccessories([...accessories,created]); setAccessoryDraft({name:'',type:'HANDLE',overlayUrl:'',sku:'',price:'',x:50,y:50,scale:1}); }
+    catch(err:any){ onError(err.message || 'Could not create accessory'); }
+  };
+  const editAccessory = async (item:any) => {
+    if (!editing) return;
+    const name=window.prompt('Accessory name',item.name); if(!name?.trim()) return;
+    const overlayUrl=window.prompt('Overlay URL',item.overlayUrl); if(!overlayUrl?.trim()) return;
+    try { const updated=await api.admin.updateAccessory(editing.id,item.id,{name:name.trim(),type:item.type,overlayUrl:overlayUrl.trim(),sku:item.sku||'',price:item.price,x:item.x,y:item.y,scale:item.scale,active:item.active}); setAccessories(accessories.map(a=>a.id===item.id?updated:a)); }
+    catch(err:any){ onError(err.message || 'Could not update accessory'); }
+  };
+  const deleteAccessory = async (id:number) => {
+    if (!editing) return;
+    try { await api.admin.deleteAccessory(editing.id,id); setAccessories(accessories.filter(a=>a.id!==id)); }
+    catch(err:any){ onError(err.message || 'Could not delete accessory'); }
   };
 
   const handleDeleteVariant = async (variantId: number) => {
@@ -571,6 +624,40 @@ export default function ProductModal({
           </div>
         </form>
 
+        {/* Product Media & Accessories */}
+        {editing && (
+          <div style={{ marginTop: '36px', borderTop: '1px solid var(--color-border, #eee)', paddingTop: '24px' }}>
+            <h3>Product Media</h3>
+            <div className="admin-list" style={{ marginBottom: 14 }}>
+              {media.map((m) => <div className="admin-row" key={m.id}><span><strong>{m.type}</strong><small>{m.url}{m.altText ? ` · ${m.altText}` : ''}</small></span><button type="button" className="btn btn-light" onClick={()=>editMedia(m)}>Edit</button><button type="button" className="icon-btn" onClick={()=>deleteMedia(m.id)} aria-label={`Delete media ${m.id}`}><Trash2 size={14} color="#c62828"/></button></div>)}
+              {!media.length && <p className="empty-state">No managed media yet.</p>}
+            </div>
+            <div style={{display:'grid',gridTemplateColumns:'120px 1fr 1fr 90px auto',gap:8}}>
+              <select className="select-field" value={mediaDraft.type} onChange={e=>setMediaDraft({...mediaDraft,type:e.target.value})}><option>IMAGE</option><option>VIDEO</option><option>360</option></select>
+              <input className="field" placeholder="Media URL" value={mediaDraft.url} onChange={e=>setMediaDraft({...mediaDraft,url:e.target.value})}/>
+              <input className="field" placeholder="Alt text" value={mediaDraft.altText} onChange={e=>setMediaDraft({...mediaDraft,altText:e.target.value})}/>
+              <input className="field" type="number" min="0" value={mediaDraft.sortOrder} onChange={e=>setMediaDraft({...mediaDraft,sortOrder:e.target.value})}/>
+              <button type="button" className="btn btn-orange" onClick={saveMedia}>Add media</button>
+            </div>
+
+            <h3 style={{marginTop:28}}>Configurator Accessories</h3>
+            <div className="admin-list" style={{ marginBottom: 14 }}>
+              {accessories.map((a)=><div className="admin-row" key={a.id}><span><strong>{a.name}</strong><small>{a.type} · {a.sku || 'No SKU'} · {a.overlayUrl}</small></span><button type="button" className="btn btn-light" onClick={()=>editAccessory(a)}>Edit</button><button type="button" className="icon-btn" onClick={()=>deleteAccessory(a.id)} aria-label={`Delete accessory ${a.id}`}><Trash2 size={14} color="#c62828"/></button></div>)}
+              {!accessories.length && <p className="empty-state">No configurator accessories yet.</p>}
+            </div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 120px 1fr 120px 90px 90px 90px auto',gap:8}}>
+              <input className="field" placeholder="Name" value={accessoryDraft.name} onChange={e=>setAccessoryDraft({...accessoryDraft,name:e.target.value})}/>
+              <input className="field" placeholder="Type" value={accessoryDraft.type} onChange={e=>setAccessoryDraft({...accessoryDraft,type:e.target.value})}/>
+              <input className="field" placeholder="Overlay URL" value={accessoryDraft.overlayUrl} onChange={e=>setAccessoryDraft({...accessoryDraft,overlayUrl:e.target.value})}/>
+              <input className="field" placeholder="SKU" value={accessoryDraft.sku} onChange={e=>setAccessoryDraft({...accessoryDraft,sku:e.target.value})}/>
+              <input className="field" type="number" placeholder="Price" value={accessoryDraft.price} onChange={e=>setAccessoryDraft({...accessoryDraft,price:e.target.value})}/>
+              <input className="field" type="number" placeholder="X" value={accessoryDraft.x} onChange={e=>setAccessoryDraft({...accessoryDraft,x:e.target.value})}/>
+              <input className="field" type="number" placeholder="Y" value={accessoryDraft.y} onChange={e=>setAccessoryDraft({...accessoryDraft,y:e.target.value})}/>
+              <button type="button" className="btn btn-orange" onClick={saveAccessory}>Add</button>
+            </div>
+          </div>
+        )}
+
         {/* Product Variants Matrix Section */}
         {editing && (
           <div style={{ marginTop: '36px', borderTop: '1px solid var(--color-border, #eee)', paddingTop: '24px' }}>
@@ -604,6 +691,9 @@ export default function ProductModal({
                       <td style={{ padding: '8px' }}>{money(v.price || v.priceOverride || form.price)}</td>
                       <td style={{ padding: '8px' }}>{v.stockQuantity ?? 50}</td>
                       <td style={{ padding: '8px' }}>
+                        <button type="button" onClick={() => handleEditVariant(v)} className="icon-btn" title="Edit variant">
+                          <Layers size={14} />
+                        </button>
                         <button
                           type="button"
                           onClick={() => handleDeleteVariant(v.id)}
@@ -669,13 +759,14 @@ export default function ProductModal({
                   onChange={(e) => setVariantDraft({ ...variantDraft, stockQuantity: Number(e.target.value) })}
                   placeholder="Stock"
                 />
+                {editingVariantId && <button type="button" onClick={() => setEditingVariantId(null)} className="btn btn-light">Cancel Edit</button>}
                 <button
                   type="button"
-                  onClick={handleAddVariant}
+                  onClick={editingVariantId ? handleSaveVariant : handleAddVariant}
                   className="btn btn-orange"
                   style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px' }}
                 >
-                  <Plus size={16} /> Add
+                  {editingVariantId ? <Layers size={16} /> : <Plus size={16} />} {editingVariantId ? 'Save Changes' : 'Add'}
                 </button>
               </div>
             </div>

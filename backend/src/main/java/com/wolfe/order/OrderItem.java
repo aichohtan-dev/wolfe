@@ -35,6 +35,12 @@ public class OrderItem {
     @Column(name = "bundle_discount", nullable = false)
     private long bundleDiscount;
 
+    @Column(name = "coupon_discount", nullable = false)
+    private long couponDiscount;
+
+    @Column(name = "line_net_amount", nullable = false)
+    private long lineNetAmount;
+
     @Column(name = "variant_id")
     private Long variantId;
 
@@ -51,12 +57,18 @@ public class OrderItem {
 
     public OrderItem(String orderId, Long productId, String productName, int quantity, long unitPrice,
                      String configurationToken, String configurationJson, Long bundleId, long bundleDiscount) {
-        this(orderId, productId, productName, quantity, unitPrice, configurationToken, configurationJson, bundleId, bundleDiscount, null, null, null, null);
+        this(orderId, productId, productName, quantity, unitPrice, configurationToken, configurationJson, bundleId, bundleDiscount, 0, unitPrice * quantity, null, null, null, null);
     }
 
     public OrderItem(String orderId, Long productId, String productName, int quantity, long unitPrice,
                      String configurationToken, String configurationJson, Long bundleId, long bundleDiscount,
                      Long variantId, String variantSku, String variantTitle, String variantAttributesJson) {
+        this(orderId, productId, productName, quantity, unitPrice, configurationToken, configurationJson, bundleId, bundleDiscount, 0, unitPrice * quantity, variantId, variantSku, variantTitle, variantAttributesJson);
+    }
+
+    public OrderItem(String orderId, Long productId, String productName, int quantity, long unitPrice,
+                     String configurationToken, String configurationJson, Long bundleId, long bundleDiscount,
+                     long couponDiscount, long lineNetAmount, Long variantId, String variantSku, String variantTitle, String variantAttributesJson) {
         this.orderId = orderId;
         this.productId = productId;
         this.productName = productName;
@@ -66,6 +78,8 @@ public class OrderItem {
         this.configurationJson = configurationJson;
         this.bundleId = bundleId;
         this.bundleDiscount = bundleDiscount;
+        this.couponDiscount = couponDiscount;
+        this.lineNetAmount = lineNetAmount;
         this.variantId = variantId;
         this.variantSku = variantSku;
         this.variantTitle = variantTitle;
@@ -82,6 +96,8 @@ public class OrderItem {
     public String getConfigurationJson() { return configurationJson; }
     public Long getBundleId() { return bundleId; }
     public long getBundleDiscount() { return bundleDiscount; }
+    public long getCouponDiscount() { return couponDiscount; }
+    public long getLineNetAmount() { return lineNetAmount; }
     public Long getVariantId() { return variantId; }
     public String getVariantSku() { return variantSku; }
     public String getVariantTitle() { return variantTitle; }

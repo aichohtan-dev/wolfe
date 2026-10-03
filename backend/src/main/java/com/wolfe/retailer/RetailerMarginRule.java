@@ -45,8 +45,10 @@ public class RetailerMarginRule {
         this.category = category;
         this.productId = productId;
         this.variantId = variantId;
-        this.marginType = marginType != null ? marginType : "PERCENTAGE";
+        this.marginType = marginType != null ? marginType.trim().toUpperCase() : "PERCENTAGE";
         this.marginValue = marginValue != null ? marginValue : new BigDecimal("10.0");
+        if (!"PERCENTAGE".equals(this.marginType) && !"FIXED".equals(this.marginType)) throw new IllegalArgumentException("invalid margin type");
+        if (this.marginValue.signum() <= 0 || ("PERCENTAGE".equals(this.marginType) && this.marginValue.compareTo(new BigDecimal("100")) > 0)) throw new IllegalArgumentException("invalid margin value");
         this.priority = priority;
         this.active = true;
         this.createdAt = OffsetDateTime.now();

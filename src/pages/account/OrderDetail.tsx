@@ -13,6 +13,7 @@ export function OrderDetail({ user }: OrderDetailProps) {
   const [error, setError] = useState('');
   const [reason, setReason] = useState('');
   const [returnSent, setReturnSent] = useState(false);
+  const [returnQty, setReturnQty] = useState<Record<number, number>>({});
   const [history, setHistory] = useState<any[]>([]);
 
   useEffect(() => {
@@ -47,6 +48,7 @@ export function OrderDetail({ user }: OrderDetailProps) {
   }
 
   const o = data.order;
+  const orderItems = data.items || [];
   return (
     <main className="container-w section">
       <p className="eyebrow">Order detail</p>
@@ -70,7 +72,7 @@ export function OrderDetail({ user }: OrderDetailProps) {
                   {i.productName} × {i.quantity}
                   {i.configurationToken ? ` · configured${cfgLabel}` : ''}
                 </span>
-                <span>{money(i.unitPrice / 100 * i.quantity)}</span>
+                <span>{money(Number(i.lineNetAmount ?? (i.unitPrice * i.quantity)) / 100)}</span>
               </div>
             );
           })}
@@ -124,11 +126,13 @@ export function OrderDetail({ user }: OrderDetailProps) {
           style={{ maxWidth: 720, marginTop: 32 }}
           onSubmit={async (e) => {
             e.preventDefault();
-            await api.returns.create(user.id, o.id, reason);
+            const selected = orderItems.map((i: any) => ({ orderItemId: i.id, quantity: returnQty[i.id] ?? i.quantity })).filter((x: any) => x.quantity > 0);
+            await api.returns.create(user.id, o.id, reason, selected);
             setReturnSent(true);
           }}
         >
           <h2>Request a return</h2>
+          {orderItems.map((i: any) => <label key={i.id} style={{display:'block',marginBottom:8}}>{i.productName} (max {i.quantity})<input className="field" type="number" min={0} max={i.quantity} value={returnQty[i.id] ?? i.quantity} onChange={e => setReturnQty(v => ({...v, [i.id]: Math.max(0, Math.min(i.quantity, Number(e.target.value) || 0))}))} /></label>)}
           <textarea
             required
             minLength={10}

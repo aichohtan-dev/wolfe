@@ -24,13 +24,13 @@ public class ProductSubcategoryController {
     }
 
     @GetMapping("/admin/subcategories")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
     public List<ProductSubcategory> listAdmin() {
         return repo.findAllByOrderByCategoryNameAscSortOrderAscNameAsc();
     }
 
     @PostMapping("/admin/subcategories")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ResponseEntity<ProductSubcategory> create(@RequestBody SubcategoryRequest req) {
         if (req == null || req.name() == null || req.name().isBlank() || req.categoryName() == null || req.categoryName().isBlank()) {
             throw new IllegalArgumentException("Subcategory name and category name are required");
@@ -43,7 +43,7 @@ public class ProductSubcategoryController {
     }
 
     @PutMapping("/admin/subcategories/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ResponseEntity<ProductSubcategory> update(@PathVariable Long id, @RequestBody SubcategoryRequest req) {
         ProductSubcategory sub = repo.findById(id).orElseThrow(() -> new IllegalArgumentException("Subcategory not found"));
         String name = req.name() != null && !req.name().isBlank() ? req.name().trim() : sub.getName();
@@ -54,7 +54,7 @@ public class ProductSubcategoryController {
     }
 
     @DeleteMapping("/admin/subcategories/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
     public ResponseEntity<Void> delete(@PathVariable Long id) {
         if (!repo.existsById(id)) return ResponseEntity.notFound().build();
         repo.deleteById(id);

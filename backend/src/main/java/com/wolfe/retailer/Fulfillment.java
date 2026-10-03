@@ -4,9 +4,7 @@ import jakarta.persistence.*;
 import java.time.OffsetDateTime;
 
 @Entity
-@Table(name = "fulfillments", uniqueConstraints = {
-    @UniqueConstraint(columnNames = {"order_id", "retailer_id"})
-})
+@Table(name = "fulfillments")
 public class Fulfillment {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -19,7 +17,7 @@ public class Fulfillment {
     private Long retailerId;
 
     @Column(nullable = false, length = 50)
-    private String status = "ASSIGNED"; // ASSIGNED, ACCEPTED, PACKED, READY_FOR_DELIVERY, OUT_FOR_DELIVERY, DELIVERED, CANCELLED, FAILED_DELIVERY, RETURNED
+    private String status = "ASSIGNED"; // ASSIGNED, ACCEPTED, PACKED, READY_FOR_DELIVERY, OUT_FOR_DELIVERY, DELIVERED, CANCELLED, FAILED_DELIVERY, REASSIGNED, RETURNED
 
     @Column(name = "tracking_number", length = 100)
     private String trackingNumber;
@@ -62,6 +60,7 @@ public class Fulfillment {
     public Long getId() { return id; }
     public String getOrderId() { return orderId; }
     public Long getRetailerId() { return retailerId; }
+    public void setRetailerId(Long retailerId) { this.retailerId = retailerId; touch(); }
     public String getStatus() { return status; }
     public void setStatus(String status) { this.status = status; touch(); }
     public String getTrackingNumber() { return trackingNumber; }

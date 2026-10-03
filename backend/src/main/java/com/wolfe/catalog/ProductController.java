@@ -2,6 +2,7 @@ package com.wolfe.catalog;
 
 import java.math.BigDecimal;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicReference;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 public class ProductController {
     private final ProductRepository repository;
     private final ProductVariantRepository variants;
+    private final AtomicReference<FilterCache> filterCache = new AtomicReference<>();
 
     public ProductController(ProductRepository repository, ProductVariantRepository variants) {
         this.repository = repository;
@@ -20,7 +22,7 @@ public class ProductController {
     }
 
     @GetMapping
-    public List<Product> list(
+    public List<ProductPublicView> list(
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String subcategory,
             @RequestParam(required = false) String brand,
@@ -37,9 +39,10 @@ public class ProductController {
             @RequestParam(required = false) Integer page,
             @RequestParam(required = false) Integer pageSize
     ) {
+        validateSearchRange(q, minPrice, maxPrice);
         int p = page == null || page < 0 ? 0 : page;
-        int s = pageSize == null || pageSize < 1 ? 1000 : Math.min(pageSize, 1000);
-        return queryPaged(category, subcategory, brand, brandId, q, finish, material, color, style, minPrice, maxPrice, featured, sort, p, s).getContent();
+        int s = pageSize == null || pageSize < 1 ? 100 : Math.min(pageSize, 100);
+        return queryPaged(category, subcategory, brand, brandId, q, finish, material, color, style, minPrice, maxPrice, featured, sort, p, s).getContent().stream().map(ProductPublicView::new).toList();
     }
 
     @GetMapping("/paged")
@@ -60,11 +63,12 @@ public class ProductController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "24") int pageSize
     ) {
+        validateSearchRange(q, minPrice, maxPrice);
         int p = Math.max(0, page);
         int s = Math.min(Math.max(1, pageSize), 100);
         Page<Product> res = queryPaged(category, subcategory, brand, brandId, q, finish, material, color, style, minPrice, maxPrice, featured, sort, p, s);
         return new PagedProductResponse(
-                res.getContent(),
+                res.getContent().stream().map(ProductPublicView::new).toList(),
                 res.getNumber(),
                 res.getSize(),
                 res.getTotalElements(),
@@ -120,13 +124,13 @@ public class ProductController {
                 predicates.add(cb.equal(root.get("featured"), featured));
             }
             if (q != null && !q.isBlank()) {
-                String pattern = "%" + q.trim().toLowerCase() + "%";
+                String pattern = "%" + escapeLike(q.trim().toLowerCase(Locale.ROOT)) + "%";
                 predicates.add(cb.or(
-                        cb.like(cb.lower(root.get("name")), pattern),
-                        cb.like(cb.lower(cb.coalesce(root.get("description"), "")), pattern),
-                        cb.like(cb.lower(root.get("slug")), pattern),
-                        cb.like(cb.lower(cb.coalesce(root.get("brandName"), "")), pattern),
-                        cb.like(cb.lower(cb.coalesce(root.get("subcategory"), "")), pattern)
+                        cb.like(cb.lower(root.get("name")), pattern, '\\'),
+                        cb.like(cb.lower(cb.coalesce(root.get("description"), "")), pattern, '\\'),
+                        cb.like(cb.lower(root.get("slug")), pattern, '\\'),
+                        cb.like(cb.lower(cb.coalesce(root.get("brandName"), "")), pattern, '\\'),
+                        cb.like(cb.lower(cb.coalesce(root.get("subcategory"), "")), pattern, '\\')
                 ));
             }
             return cb.and(predicates.toArray(new jakarta.persistence.criteria.Predicate[0]));
@@ -138,9 +142,9 @@ public class ProductController {
     private Sort buildSort(String sort) {
         String s = sort == null ? "featured" : sort.trim().toLowerCase();
         return switch (s) {
-            case "price_asc" -> Sort.by(Sort.Direction.ASC, "price");
-            case "price_desc" -> Sort.by(Sort.Direction.DESC, "price");
-            case "name_asc" -> Sort.by(Sort.Direction.ASC, "name");
+            case "price_asc" -> Sort.by(Sort.Direction.ASC, "price").and(Sort.by(Sort.Direction.ASC, "id"));
+            case "price_desc" -> Sort.by(Sort.Direction.DESC, "price").and(Sort.by(Sort.Direction.ASC, "id"));
+            case "name_asc" -> Sort.by(Sort.Direction.ASC, "name").and(Sort.by(Sort.Direction.ASC, "id"));
             case "newest" -> Sort.by(Sort.Direction.DESC, "id");
             default -> Sort.by(Sort.Direction.DESC, "featured")
                     .and(Sort.by(Sort.Direction.ASC, "sortOrder"))
@@ -163,6 +167,8 @@ public class ProductController {
 
     @GetMapping("/filters")
     public Map<String, Object> filters() {
+        FilterCache cached = filterCache.get();
+        if (cached != null && cached.expiresAt > System.currentTimeMillis()) return cached.value;
         Map<String, Object> map = new LinkedHashMap<>();
         map.put("categories", repository.findDistinctCategories());
         map.put("subcategories", repository.findDistinctSubcategories());
@@ -173,17 +179,22 @@ public class ProductController {
         map.put("finishes", repository.findDistinctFinishes());
         map.put("minPrice", repository.findMinPrice());
         map.put("maxPrice", repository.findMaxPrice());
-        return map;
+        Map<String, Object> immutable = Map.copyOf(map);
+        filterCache.set(new FilterCache(immutable, System.currentTimeMillis() + 60_000));
+        return immutable;
     }
 
+    private record FilterCache(Map<String, Object> value, long expiresAt) {}
+
     @GetMapping("/{slug}")
-    public Product get(@PathVariable String slug) {
-        return repository.findBySlug(slug).filter(Product::isActive).orElseThrow(() -> new NoSuchElementException("Product not found"));
+    public ProductPublicView get(@PathVariable String slug) {
+        Product p = repository.findBySlugIgnoreCase(slug.trim()).filter(Product::isActive).orElseThrow(() -> new NoSuchElementException("Product not found"));
+        return new ProductPublicView(p);
     }
 
     @GetMapping("/{slug}/variants")
     public List<ProductVariantFullView> variants(@PathVariable String slug) {
-        Product p = get(slug);
+        Product p = repository.findBySlugIgnoreCase(slug.trim()).filter(Product::isActive).orElseThrow(() -> new NoSuchElementException("Product not found"));
         return variants.findByProductIdAndActiveTrueOrderBySortOrderAscIdAsc(p.getId()).stream().map(ProductVariantFullView::new).toList();
     }
 
@@ -201,7 +212,6 @@ public class ProductController {
             String dimensions,
             BigDecimal price,
             BigDecimal priceOverride,
-            int stockQuantity,
             String imageUrl,
             String attributesJson,
             boolean active
@@ -221,7 +231,6 @@ public class ProductController {
                     v.getDimensions(),
                     v.getPrice(),
                     v.getPriceOverride(),
-                    v.getStockQuantity(),
                     v.getImageUrl(),
                     v.getAttributesJson(),
                     v.isActive()
@@ -229,8 +238,19 @@ public class ProductController {
         }
     }
 
+    public record ProductPublicView(Long id, String slug, String name, BigDecimal price, String category, String finish,
+                                    String material, String color, String style, String description, String imageUrl, String mediaUrls,
+                                    Long brandId, String brandName, String subcategory, String dimensions, String modelNumber,
+                                    boolean active, boolean featured, int sortOrder) {
+        public ProductPublicView(Product p) {
+            this(p.getId(), p.getSlug(), p.getName(), p.getPrice(), p.getCategory(), p.getFinish(), p.getMaterial(), p.getColor(),
+                    p.getStyle(), p.getDescription(), p.getImageUrl(), p.getMediaUrls(), p.getBrandId(), p.getBrandName(),
+                    p.getSubcategory(), p.getDimensions(), p.getModelNumber(), p.isActive(), p.isFeatured(), p.getSortOrder());
+        }
+    }
+
     public record PagedProductResponse(
-            List<Product> content,
+            List<ProductPublicView> content,
             int page,
             int pageSize,
             long totalElements,
@@ -239,6 +259,16 @@ public class ProductController {
             boolean isFirst,
             boolean isLast
     ) {}
+
+    private static void validateSearchRange(String q, BigDecimal minPrice, BigDecimal maxPrice) {
+        if (q != null && q.length() > 120) throw new IllegalArgumentException("search query is too long");
+        if (minPrice != null && minPrice.signum() < 0) throw new IllegalArgumentException("minPrice cannot be negative");
+        if (maxPrice != null && maxPrice.signum() < 0) throw new IllegalArgumentException("maxPrice cannot be negative");
+        if (minPrice != null && maxPrice != null && minPrice.compareTo(maxPrice) > 0) throw new IllegalArgumentException("minPrice cannot exceed maxPrice");
+    }
+    private static String escapeLike(String value) {
+        return value.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_");
+    }
 
     private String blankToNull(String v) {
         return v == null || v.isBlank() ? null : v.trim();

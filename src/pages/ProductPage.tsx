@@ -43,6 +43,8 @@ export default function ProductPage({
   const [activeImage, setActiveImage] = useState<string>(baseP?.image || '/catalog/brass-01.jpg');
   const [related, setRelated] = useState<any[]>([]);
   const [recent, setRecent] = useState<any[]>([]);
+  const [stockSubscribed, setStockSubscribed] = useState(false);
+  const [stockMessage, setStockMessage] = useState('');
 
   useSeo(
     liveProduct ? `${liveProduct.name} | Wolfe — Master Collection` : 'Product | Wolfe',
@@ -57,8 +59,22 @@ export default function ProductPage({
         if (p) {
           setLiveProduct(p);
           if (p.imageUrl) setActiveImage(p.imageUrl);
+          if (user) {
+            const resolvedServerId = Number(p.id || 0);
+            if (resolvedServerId > 0) {
+              api.experience.touchRecent(user.id, resolvedServerId).catch(() => {});
+              api.experience.recent(user.id).then(setRecent).catch(() => setRecent([]));
+            }
+          }
         }
-      }).catch(() => {});
+      }).catch(() => {
+        if (!user && id) {
+          const ids = read('wolfe_recently_viewed', []).filter((x: string) => x !== id);
+          const next = [id, ...ids].slice(0, 8);
+          write('wolfe_recently_viewed', next);
+          setRecent(next.map((x: string) => products.find((y) => y.id === x)).filter(Boolean));
+        }
+      });
 
       api.productVariants(id).then((vars) => {
         setVariants(vars || []);
@@ -75,15 +91,7 @@ export default function ProductPage({
 
       api.relatedProducts(id).then(setRelated).catch(() => setRelated([]));
 
-      if (user && baseP?.serverId) {
-        api.experience.touchRecent(user.id, baseP.serverId).catch(() => {});
-        api.experience.recent(user.id).then(setRecent).catch(() => setRecent([]));
-      } else if (id) {
-        const ids = read('wolfe_recently_viewed', []).filter((x: string) => x !== id);
-        const next = [id, ...ids].slice(0, 8);
-        write('wolfe_recently_viewed', next);
-        setRecent(next.map((x: string) => products.find((y) => y.id === x)).filter(Boolean));
-      }
+
     }
   }, [id, user?.id]);
 
@@ -130,8 +138,7 @@ export default function ProductPage({
         (!nextMaterial || v.material === nextMaterial)
     );
 
-    const fallback = variants.find((v) => (type === 'color' ? v.color === value : type === 'size' ? v.size === value : true));
-    const match = exact || fallback || selectedVariant;
+    const match = exact;
 
     if (match) {
       setSelectedVariant(match);
@@ -140,6 +147,10 @@ export default function ProductPage({
       if (match.size) setSelectedSize(match.size);
       if (match.finish) setSelectedFinish(match.finish);
       if (match.material) setSelectedMaterial(match.material);
+    } else if (variants.length) {
+      // Never silently fall back to a different variant combination.
+      // The cart must contain exactly the combination the customer selected.
+      setSelectedVariant(null);
     }
   };
 
@@ -178,7 +189,9 @@ export default function ProductPage({
 
   const currentPrice = selectedVariant?.price || selectedVariant?.priceOverride || p.price;
   const currentSku = selectedVariant?.sku || p.modelNumber || `WLF-${p.id}`;
-  const inStock = selectedVariant ? selectedVariant.stockQuantity > 0 : true;
+  // Checkout is the stock authority; variant stockQuantity is admin-only metadata.
+  const inStock = variants.length ? !!selectedVariant : true;
+  const subscribeProductId = Number(p.id);
 
   const mapped = (x: any) => ({
     id: x.slug || x.id,
@@ -243,7 +256,7 @@ export default function ProductPage({
         <div style={{ fontSize: '0.85rem', color: 'var(--color-muted)', margin: '-10px 0 16px' }}>
           SKU: <strong>{currentSku}</strong> · Status:{' '}
           <span style={{ color: inStock ? '#2e7d32' : '#c62828', fontWeight: 600 }}>
-            {inStock ? 'In Stock (Ready to dispatch)' : 'Made to Order'}
+            {inStock ? 'In Stock (Ready to dispatch)' : 'Out of stock'}
           </span>
         </div>
 
@@ -358,14 +371,36 @@ export default function ProductPage({
         )}
 
         <div className="detail-actions">
-          <button
-            type="button"
-            onClick={handleAddVariantToBag}
-            className="btn btn-orange"
-            disabled={!inStock}
-          >
-            {inStock ? 'Add to bag' : 'Out of stock'}
-          </button>
+          {variants.length && !selectedVariant ? (
+            <button type="button" className="btn btn-orange" disabled>
+              Selected combination unavailable
+            </button>
+          ) : inStock ? (
+            <button
+              type="button"
+              onClick={handleAddVariantToBag}
+              className="btn btn-orange"
+            >
+              Add to bag
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="btn btn-orange"
+              disabled={stockSubscribed}
+              onClick={async () => {
+                if (!user) { setStockMessage('Please sign in to get a back-in-stock alert.'); return; }
+                try {
+                  await api.experience.subscribeStock(user.id, subscribeProductId);
+                  setStockSubscribed(true);
+                  setStockMessage('We will notify you when this product is back in stock.');
+                } catch (err: any) { setStockMessage(err.message || 'Unable to subscribe for stock alerts.'); }
+              }}
+            >
+              {stockSubscribed ? 'Stock alert enabled' : 'Notify me when available'}
+            </button>
+          )}
+          {stockMessage && <p className="checkout-login-note">{stockMessage}</p>}
           <button
             type="button"
             onClick={() => onWish(p.id)}
@@ -392,7 +427,7 @@ export default function ProductPage({
         slug={p.id}
         baseImage={activeImage}
         user={user}
-        productId={p.serverId || 0}
+        productId={Number((p as any).serverId ?? p.id) || 0}
         onAddConfigured={onAddConfigured}
       />
       <SpinViewer slug={p.id} />

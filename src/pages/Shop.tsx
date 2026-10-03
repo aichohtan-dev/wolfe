@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { X, SlidersHorizontal, Search, RotateCcw } from 'lucide-react';
-import { products, type Product as LocalProduct } from '../data';
+import type { Product as LocalProduct } from '../data';
 import { api, type Product, type Brand, type Subcategory } from '../api';
 import { useSeo } from '../hooks/useSeo';
 import { read, write } from '../utils/storage';
@@ -192,31 +192,12 @@ export default function Shop({
           });
         }
       } catch {
-        // Fallback to client-side data
+        // API is authoritative; never render stale/demo prices when catalog fetch fails.
         if (isReset) {
-          let filtered = products.filter((p) => {
-            if (cat !== 'All' && p.category.toLowerCase() !== cat.toLowerCase()) return false;
-            if (subcat !== 'All' && p.subcategory && p.subcategory.toLowerCase() !== subcat.toLowerCase()) return false;
-            if (brand !== 'All' && p.brandName && p.brandName.toLowerCase() !== brand.toLowerCase()) return false;
-            if (finish !== 'All' && p.finish.toLowerCase() !== finish.toLowerCase()) return false;
-            if (material !== 'All' && p.material.toLowerCase() !== material.toLowerCase()) return false;
-            if (color !== 'All' && p.color.toLowerCase() !== color.toLowerCase()) return false;
-            if (style !== 'All' && p.style.toLowerCase() !== style.toLowerCase()) return false;
-            if (debouncedQ.trim()) {
-              const ql = debouncedQ.toLowerCase();
-              return (
-                p.name.toLowerCase().includes(ql) ||
-                p.description.toLowerCase().includes(ql) ||
-                (p.subcategory && p.subcategory.toLowerCase().includes(ql)) ||
-                (p.brandName && p.brandName.toLowerCase().includes(ql))
-              );
-            }
-            return true;
-          });
-          setItems(filtered);
-          setTotalCount(filtered.length);
-          setHasMore(false);
+          setItems([]);
+          setTotalCount(0);
         }
+        setHasMore(false);
       } finally {
         setLoading(false);
       }

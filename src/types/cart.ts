@@ -4,6 +4,8 @@ export type CartItem = {
     configurationToken?: string;
     bundleId?: number;
     bundleSlug?: string;
+    bundleUnits?: number;
+    bundleBaseQuantity?: number;
     variantId?: number;
     variantSku?: string;
     variantTitle?: string;

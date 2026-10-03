@@ -16,8 +16,8 @@ public class CustomerAddressController {
     public CustomerAddressController(CustomerAddressRepository repo) {
         this.repo = repo;
     }
-    public record AddressRequest(@NotBlank String label, @NotBlank String recipientName, @NotBlank @Size(min = 7, max = 30) String phone,
-    @NotBlank @Size(max = 1000) String address, @NotBlank String city, @NotBlank String state, @NotBlank @Size(min = 4, max = 20) String pincode,
+    public record AddressRequest(@NotBlank String label, @NotBlank String recipientName, @NotBlank @Pattern(regexp = "^\\+?[1-9]\\d{7,14}$") String phone,
+    @NotBlank @Size(max = 1000) String address, @NotBlank String city, @NotBlank String state, @NotBlank @Pattern(regexp = "^[1-9]\\d{5}$") String pincode,
     boolean isDefault) {
     }
     @GetMapping public List<CustomerAddress> list(@PathVariable Long customerId, Authentication auth) {

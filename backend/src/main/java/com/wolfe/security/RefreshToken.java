@@ -15,12 +15,18 @@ public class RefreshToken {
     @Column(name = "token_hash", nullable = false, unique = true, length = 64) private String tokenHash;
     @Column(name = "expires_at", nullable = false) private Instant expiresAt;
     @Column(name = "revoked_at") private Instant revokedAt;
+    @Column(name = "created_at", nullable = false) private Instant createdAt = Instant.now();
+    @Column(name = "device_label", length = 120) private String deviceLabel;
     protected RefreshToken() {
     }
     public RefreshToken(Long customerId, String tokenHash, Instant expiresAt) {
+        this(customerId, tokenHash, expiresAt, null);
+    }
+    public RefreshToken(Long customerId, String tokenHash, Instant expiresAt, String deviceLabel) {
         this.customerId = customerId;
         this.tokenHash = tokenHash;
         this.expiresAt = expiresAt;
+        this.deviceLabel = deviceLabel;
     }
     public Long getId() {
         return id;
@@ -37,6 +43,8 @@ public class RefreshToken {
     public Instant getRevokedAt() {
         return revokedAt;
     }
+    public Instant getCreatedAt() { return createdAt; }
+    public String getDeviceLabel() { return deviceLabel; }
     public void revoke() {
         this.revokedAt = Instant.now();
     }

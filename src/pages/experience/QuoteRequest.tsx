@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useSeo } from '../../hooks/useSeo';
 import { api, type Customer } from '../../api';
+import { TurnstileWidget } from '../../components/security/TurnstileWidget';
 
 export function QuoteRequest({ user }: {
     user: Customer | null;
@@ -9,11 +10,12 @@ export function QuoteRequest({ user }: {
     const [message, setMessage] = useState('');
     const [hp, setHp] = useState('');
     const [sent, setSent] = useState(false);
+    const [captchaToken, setCaptchaToken] = useState('');
 
     const submit = async (e: any) => {
         e.preventDefault();
         if (!user || hp) return;
-        await api.quotes.create(user.id, { message });
+        await api.quotes.create(user.id, { message, captchaToken });
         setSent(true);
         setMessage('');
     };
@@ -41,6 +43,7 @@ export function QuoteRequest({ user }: {
                         placeholder="Products, quantities, room, timeline or anything else we should know"
                         className="field textarea"
                     />
+                    <TurnstileWidget onToken={setCaptchaToken} />
                     <button className="btn btn-orange">Request quote</button>
                 </form>
             )}

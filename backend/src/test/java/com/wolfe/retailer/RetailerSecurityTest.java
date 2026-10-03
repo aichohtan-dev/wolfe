@@ -63,8 +63,8 @@ public class RetailerSecurityTest {
         assertFalse(response.containsKey("settlement"));
         assertFalse(response.containsKey("retailerPayable"));
 
-        Order returnedOrder = (Order) response.get("order");
-        assertEquals("CONFIRMED", returnedOrder.getStatus());
-        assertEquals(840000, returnedOrder.getTotal());
+        var returnedOrder = (com.wolfe.order.OrderController.OrderView) response.get("order");
+        assertEquals("CONFIRMED", returnedOrder.status());
+        assertEquals(840000, returnedOrder.total());
     }
 }

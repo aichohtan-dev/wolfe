@@ -22,6 +22,7 @@ export default function Admin() {
     | 'reviews'
     | 'quotes'
     | 'custom'
+    | 'consultations'
     | 'visual'
     | 'experience'
     | 'commerce'
@@ -39,6 +40,7 @@ export default function Admin() {
   const [adminReviews, setAdminReviews] = useState<any[]>([]);
   const [adminQuotes, setAdminQuotes] = useState<any[]>([]);
   const [adminCustom, setAdminCustom] = useState<any[]>([]);
+  const [adminConsultations, setAdminConsultations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [adminBundles, setAdminBundles] = useState<any[]>([]);
@@ -55,6 +57,16 @@ export default function Admin() {
     active: true,
     sortOrder: 0,
   });
+
+  const [experienceProductId, setExperienceProductId] = useState<number | null>(null);
+  const [experienceAsset, setExperienceAsset] = useState<any | null>(null);
+  const [spinItems, setSpinItems] = useState<any[]>([]);
+  const [spinDraft, setSpinDraft] = useState<any>({ imageUrl: '', sortOrder: 0 });
+  const [editingSpinId, setEditingSpinId] = useState<number | null>(null);
+  const [experienceVisualId, setExperienceVisualId] = useState<number | null>(null);
+  const [hotspotItems, setHotspotItems] = useState<any[]>([]);
+  const [hotspotDraft, setHotspotDraft] = useState<any>({ label: '', targetSlug: '', x: 50, y: 50, active: true });
+  const [editingHotspotId, setEditingHotspotId] = useState<number | null>(null);
 
   const [editing, setEditing] = useState<any | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -126,6 +138,28 @@ export default function Admin() {
   const [manualAssignRetId, setManualAssignRetId] = useState<number | null>(null);
   const [manualAssignNotes, setManualAssignNotes] = useState<string>('');
 
+  const loadExperienceProduct = async (id: number | null) => {
+    setExperienceProductId(id);
+    setExperienceAsset(null);
+    setSpinItems([]);
+    if (!id) return;
+    const [asset, spins] = await Promise.all([
+      api.admin.getVisualAsset(id).catch(() => null),
+      api.admin.listSpin(id).catch(() => []),
+    ]);
+    setExperienceAsset(asset);
+    setSpinItems(spins || []);
+  };
+
+  const loadExperienceVisual = async (id: number | null) => {
+    setExperienceVisualId(id);
+    setHotspotItems([]);
+    setEditingHotspotId(null);
+    if (!id) return;
+    const hotspots = await api.admin.listHotspots(id).catch(() => []);
+    setHotspotItems(hotspots || []);
+  };
+
   const load = async () => {
     setLoading(true);
     setError('');
@@ -141,6 +175,7 @@ export default function Admin() {
         rv,
         qt,
         cd,
+        consultations,
         vc,
         b,
         cps,
@@ -165,6 +200,7 @@ export default function Admin() {
         api.admin.reviews(),
         api.admin.quotes(),
         api.admin.customDesign(),
+        api.admin.consultations().catch(() => []),
         api.admin.visualContent(),
         api.admin.bundles(),
         api.admin.coupons(),
@@ -190,6 +226,7 @@ export default function Admin() {
       setAdminReviews(rv);
       setAdminQuotes(qt);
       setAdminCustom(cd);
+      setAdminConsultations(consultations);
       setVisualItems(vc);
       setCouponItems(cps);
       setReturnItems(rr);
@@ -440,6 +477,7 @@ export default function Admin() {
             'reviews',
             'quotes',
             'custom',
+            'consultations',
             'visual',
             'experience',
             'commerce',
@@ -1392,7 +1430,26 @@ export default function Admin() {
                         <span className={`badge ${s.status === 'SETTLED' ? 'badge-green' : s.status === 'ELIGIBLE' ? 'badge-blue' : 'badge-yellow'}`}>
                           {s.status}
                         </span>
-                        {s.status !== 'SETTLED' && (
+                        {s.status === 'ELIGIBLE' && s.cashExpectedAmount && s.cashReconciliationStatus !== 'RECONCILED' && (
+                          <button
+                            className="btn btn-light"
+                            style={{ padding: '4px 10px', fontSize: 12 }}
+                            onClick={async () => {
+                              const expected = Number(prompt('Expected COD cash (₹):', String((s.cashExpectedAmount || 0) / 100)));
+                              if (!Number.isFinite(expected) || expected < 0) return;
+                              const collected = Number(prompt('Collected COD cash (₹):', String(expected)));
+                              const deposited = Number(prompt('Deposited COD cash (₹):', String(expected)));
+                              const ref = prompt('Cash deposit/reconciliation reference:', `CASH-WLF-${Date.now()}`);
+                              if (ref) {
+                                await api.admin.settlements.reconcileCash(s.id, Math.round(expected * 100), Math.round(collected * 100), Math.round(deposited * 100), ref);
+                                await load();
+                              }
+                            }}
+                          >
+                            Reconcile COD
+                          </button>
+                        )}
+                        {s.status === 'ELIGIBLE' && (!s.cashExpectedAmount || s.cashReconciliationStatus === 'RECONCILED') && (
                           <button
                             className="btn btn-light"
                             style={{ padding: '4px 10px', fontSize: 12 }}
@@ -1660,12 +1717,10 @@ export default function Admin() {
                     <select
                       value={o.status}
                       onChange={(e) => setStatus(o.id, e.target.value)}
+                      aria-label={`Order ${o.id} status`}
                     >
-                      <option>CONFIRMED</option>
-                      <option>PROCESSING</option>
-                      <option>SHIPPED</option>
-                      <option>DELIVERED</option>
-                      <option>CANCELLED</option>
+                      <option value={o.status}>{o.status}</option>
+                      {o.status !== 'CANCELLED' && o.status !== 'DELIVERED' && <option value="CANCELLED">CANCELLED</option>}
                     </select>
                     <button
                       onClick={async () => {
@@ -1753,6 +1808,23 @@ export default function Admin() {
                   </select>
                 </div>
               ))}
+            </div>
+          )}
+          {tab === 'consultations' && (
+            <div className="admin-panel">
+              <h2>Consultation requests</h2>
+              <p className="admin-help">Customer requests submitted from the public consultation form.</p>
+              <div className="admin-list">
+                {adminConsultations.map((c) => (
+                  <div className="admin-row" key={c.id}>
+                    <span><strong>#{c.id} · {c.name}</strong><small>{c.email} · {c.project || 'No project'} · {c.message}</small><small>{new Date(c.createdAt).toLocaleString('en-IN')}</small></span>
+                    <select value={c.status} onChange={async (e) => { await api.admin.consultationStatus(c.id, e.target.value); setAdminConsultations(await api.admin.consultations()); }}>
+                      <option>NEW</option><option>CONTACTED</option><option>IN_PROGRESS</option><option>COMPLETED</option><option>CLOSED</option>
+                    </select>
+                  </div>
+                ))}
+                {!adminConsultations.length && <p className="empty-state">No consultation requests.</p>}
+              </div>
             </div>
           )}
           {tab === 'visual' && (
@@ -1912,175 +1984,170 @@ export default function Admin() {
             <div className="admin-overview-grid">
               <div className="admin-panel">
                 <h2>360° / 3D / AR experience</h2>
-                <p className="admin-help">
-                  Attach a 3D model, AR-ready asset or poster to a product.
-                </p>
+                <p className="admin-help">Manage existing product visual assets and save updates.</p>
+                <select
+                  className="select-field"
+                  value={experienceProductId ?? ''}
+                  onChange={(e) => loadExperienceProduct(Number(e.target.value) || null)}
+                >
+                  <option value="">Select product</option>
+                  {adminProducts.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
                 <form
                   onSubmit={async (e) => {
                     e.preventDefault();
+                    if (!experienceProductId) return;
                     const fd = new FormData(e.currentTarget);
-                    const id = Number(fd.get('productId'));
-                    if (!id) return;
-                    await api.admin.visualAsset(id, {
+                    const saved = await api.admin.visualAsset(experienceProductId, {
                       modelUrl: String(fd.get('modelUrl') || ''),
                       arUrl: String(fd.get('arUrl') || ''),
                       posterUrl: String(fd.get('posterUrl') || ''),
-                      active: true,
+                      active: String(fd.get('active')) === 'true',
                     });
+                    setExperienceAsset(saved);
                     setError('Visual asset saved.');
                   }}
                 >
-                  <select
-                    className="select-field"
-                    defaultValue=""
-                    name="productId"
-                    required
-                  >
-                    <option value="" disabled>
-                      Select product
-                    </option>
-                    {adminProducts.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name}
-                      </option>
-                    ))}
+                  <input name="modelUrl" className="field" placeholder="3D model URL" defaultValue={experienceAsset?.modelUrl || ''} key={`model-${experienceAsset?.id || 'new'}`} />
+                  <input name="arUrl" className="field" placeholder="AR asset URL" defaultValue={experienceAsset?.arUrl || ''} key={`ar-${experienceAsset?.id || 'new'}`} />
+                  <input name="posterUrl" className="field" placeholder="Poster URL" defaultValue={experienceAsset?.posterUrl || ''} key={`poster-${experienceAsset?.id || 'new'}`} />
+                  <select name="active" className="select-field" defaultValue={experienceAsset?.active === false ? 'false' : 'true'} key={`active-${experienceAsset?.id || 'new'}`}>
+                    <option value="true">Active</option>
+                    <option value="false">Inactive</option>
                   </select>
-                  <input
-                    name="modelUrl"
-                    className="field"
-                    placeholder="3D model URL"
-                  />
-                  <input
-                    name="arUrl"
-                    className="field"
-                    placeholder="AR asset URL"
-                  />
-                  <input
-                    name="posterUrl"
-                    className="field"
-                    placeholder="Poster URL"
-                  />
-                  <button className="btn btn-orange" type="submit">
-                    Save visual asset
-                  </button>
-                </form>
-              </div>
-              <div className="admin-panel">
-                <h2>360° spin frame</h2>
-                <p className="admin-help">
-                  Add a frame URL to the selected product. Frames are served in
-                  product spin view.
-                </p>
-                <form
-                  onSubmit={async (e) => {
-                    e.preventDefault();
-                    const fd = new FormData(e.currentTarget);
-                    const id = Number(fd.get('productId'));
-                    const imageUrl = String(fd.get('imageUrl') || '').trim();
-                    if (!id || !imageUrl) return;
-                    await api.admin.spin(id, {
-                      imageUrl,
-                      sortOrder: Number(fd.get('sortOrder') || 0),
-                    });
-                    setError('Spin frame added.');
-                  }}
-                >
-                  <select
-                    className="select-field"
-                    defaultValue=""
-                    name="productId"
-                    required
-                  >
-                    <option value="" disabled>
-                      Select product
-                    </option>
-                    {adminProducts.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name}
-                      </option>
-                    ))}
-                  </select>
-                  <input
-                    name="imageUrl"
-                    className="field"
-                    placeholder="Frame image URL"
-                    required
-                  />
-                  <input
-                    name="sortOrder"
-                    className="field"
-                    type="number"
-                    min="0"
-                    defaultValue="0"
-                    placeholder="Frame order"
-                  />
-                  <button className="btn" type="submit">
-                    Add spin frame
-                  </button>
-                </form>
-              </div>
-              <div className="admin-panel">
-                <h2>Visual hotspot</h2>
-                <p className="admin-help">
-                  Attach a hotspot to an existing visual-content record.
-                </p>
-                <form
-                  onSubmit={async (e) => {
-                    e.preventDefault();
-                    const fd = new FormData(e.currentTarget);
-                    const id = Number(fd.get('visualId'));
-                    if (!id) return;
-                    await api.admin.hotspot(id, {
-                      label: String(fd.get('label') || ''),
-                      targetSlug: String(fd.get('targetSlug') || ''),
-                      x: Number(fd.get('x') || 50),
-                      y: Number(fd.get('y') || 50),
-                      active: true,
-                    });
-                    setError('Hotspot added.');
-                  }}
-                >
-                  <input
-                    name="visualId"
-                    className="field"
-                    type="number"
-                    placeholder="Visual content ID"
-                    required
-                  />
-                  <input
-                    name="label"
-                    className="field"
-                    placeholder="Hotspot label"
-                  />
-                  <input
-                    name="targetSlug"
-                    className="field"
-                    placeholder="Target product slug"
-                  />
-                  <div className="admin-variant-add">
-                    <input
-                      name="x"
-                      className="field"
-                      type="number"
-                      min="0"
-                      max="100"
-                      defaultValue="50"
-                      placeholder="X %"
-                    />
-                    <input
-                      name="y"
-                      className="field"
-                      type="number"
-                      min="0"
-                      max="100"
-                      defaultValue="50"
-                      placeholder="Y %"
-                    />
-                    <button className="btn" type="submit">
-                      Add hotspot
-                    </button>
+                  <div className="admin-actions">
+                    <button className="btn btn-orange" type="submit" disabled={!experienceProductId}>Save / update visual asset</button>
+                    {experienceAsset && experienceProductId && (
+                      <button
+                        className="btn btn-danger"
+                        type="button"
+                        onClick={async () => {
+                          if (!window.confirm('Delete this product visual asset?')) return;
+                          await api.admin.deleteVisualAsset(experienceProductId);
+                          setExperienceAsset(null);
+                          setError('Visual asset deleted.');
+                        }}
+                      >
+                        Delete asset
+                      </button>
+                    )}
                   </div>
                 </form>
+                {experienceAsset && (
+                  <p className="admin-help">Asset #{experienceAsset.id} · Product #{experienceAsset.productId} · {experienceAsset.active ? 'Active' : 'Inactive'}</p>
+                )}
+              </div>
+
+              <div className="admin-panel">
+                <h2>360° spin frames</h2>
+                <p className="admin-help">Existing frames are listed below. Add, edit, reorder or delete them.</p>
+                <select
+                  className="select-field"
+                  value={experienceProductId ?? ''}
+                  onChange={(e) => loadExperienceProduct(Number(e.target.value) || null)}
+                >
+                  <option value="">Select product</option>
+                  {adminProducts.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    if (!experienceProductId || !spinDraft.imageUrl.trim()) return;
+                    const body = { imageUrl: spinDraft.imageUrl.trim(), sortOrder: Number(spinDraft.sortOrder) || 0 };
+                    if (editingSpinId) {
+                      await api.admin.updateSpin(editingSpinId, body);
+                      setError('Spin frame updated.');
+                    } else {
+                      await api.admin.spin(experienceProductId, body);
+                      setError('Spin frame added.');
+                    }
+                    setEditingSpinId(null);
+                    setSpinDraft({ imageUrl: '', sortOrder: 0 });
+                    await loadExperienceProduct(experienceProductId);
+                  }}
+                >
+                  <input className="field" value={spinDraft.imageUrl} onChange={(e) => setSpinDraft({ ...spinDraft, imageUrl: e.target.value })} placeholder="Frame image URL" required />
+                  <input className="field" type="number" min="0" value={spinDraft.sortOrder} onChange={(e) => setSpinDraft({ ...spinDraft, sortOrder: e.target.value })} placeholder="Frame order" />
+                  <button className="btn" type="submit" disabled={!experienceProductId}>{editingSpinId ? 'Update spin frame' : 'Add spin frame'}</button>
+                  {editingSpinId && <button className="btn" type="button" onClick={() => { setEditingSpinId(null); setSpinDraft({ imageUrl: '', sortOrder: 0 }); }}>Cancel edit</button>}
+                </form>
+                <div className="admin-list">
+                  {spinItems.length === 0 ? <p className="admin-help">No spin frames for this product.</p> : spinItems.map((frame) => (
+                    <div key={frame.id} className="admin-list-row">
+                      <div>
+                        <strong>#{frame.sortOrder}</strong>
+                        <div style={{ fontSize: 12, wordBreak: 'break-all' }}>{frame.imageUrl}</div>
+                      </div>
+                      <div className="admin-actions">
+                        <button className="btn" type="button" onClick={() => { setEditingSpinId(frame.id); setSpinDraft({ imageUrl: frame.imageUrl, sortOrder: frame.sortOrder }); }}>Edit</button>
+                        <button className="btn btn-danger" type="button" onClick={async () => { if (!window.confirm('Delete this spin frame?')) return; await api.admin.deleteSpin(frame.id); await loadExperienceProduct(experienceProductId); setError('Spin frame deleted.'); }}>Delete</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="admin-panel">
+                <h2>Visual hotspots</h2>
+                <p className="admin-help">Select an existing visual-content record to manage its hotspots.</p>
+                <select
+                  className="select-field"
+                  value={experienceVisualId ?? ''}
+                  onChange={(e) => loadExperienceVisual(Number(e.target.value) || null)}
+                >
+                  <option value="">Select visual content</option>
+                  {visualItems.map((v) => <option key={v.id} value={v.id}>#{v.id} — {v.title}</option>)}
+                </select>
+                <form
+                  onSubmit={async (e) => {
+                    e.preventDefault();
+                    if (!experienceVisualId || !hotspotDraft.label.trim() || !hotspotDraft.targetSlug.trim()) return;
+                    const body = {
+                      label: hotspotDraft.label.trim(),
+                      targetSlug: hotspotDraft.targetSlug.trim(),
+                      x: Number(hotspotDraft.x),
+                      y: Number(hotspotDraft.y),
+                      active: !!hotspotDraft.active,
+                    };
+                    if (editingHotspotId) {
+                      await api.admin.updateHotspot(editingHotspotId, body);
+                      setError('Hotspot updated.');
+                    } else {
+                      await api.admin.hotspot(experienceVisualId, body);
+                      setError('Hotspot added.');
+                    }
+                    setEditingHotspotId(null);
+                    setHotspotDraft({ label: '', targetSlug: '', x: 50, y: 50, active: true });
+                    await loadExperienceVisual(experienceVisualId);
+                  }}
+                >
+                  <input className="field" value={hotspotDraft.label} onChange={(e) => setHotspotDraft({ ...hotspotDraft, label: e.target.value })} placeholder="Hotspot label" required />
+                  <input className="field" value={hotspotDraft.targetSlug} onChange={(e) => setHotspotDraft({ ...hotspotDraft, targetSlug: e.target.value })} placeholder="Target product slug" required />
+                  <div className="admin-variant-add">
+                    <input className="field" type="number" min="0" max="100" value={hotspotDraft.x} onChange={(e) => setHotspotDraft({ ...hotspotDraft, x: e.target.value })} placeholder="X %" />
+                    <input className="field" type="number" min="0" max="100" value={hotspotDraft.y} onChange={(e) => setHotspotDraft({ ...hotspotDraft, y: e.target.value })} placeholder="Y %" />
+                  </div>
+                  <select className="select-field" value={hotspotDraft.active ? 'true' : 'false'} onChange={(e) => setHotspotDraft({ ...hotspotDraft, active: e.target.value === 'true' })}>
+                    <option value="true">Active</option>
+                    <option value="false">Inactive</option>
+                  </select>
+                  <button className="btn" type="submit" disabled={!experienceVisualId}>{editingHotspotId ? 'Update hotspot' : 'Add hotspot'}</button>
+                  {editingHotspotId && <button className="btn" type="button" onClick={() => { setEditingHotspotId(null); setHotspotDraft({ label: '', targetSlug: '', x: 50, y: 50, active: true }); }}>Cancel edit</button>}
+                </form>
+                <div className="admin-list">
+                  {hotspotItems.length === 0 ? <p className="admin-help">No hotspots for this visual.</p> : hotspotItems.map((h) => (
+                    <div key={h.id} className="admin-list-row">
+                      <div>
+                        <strong>{h.label}</strong>
+                        <div style={{ fontSize: 12 }}>Target: {h.targetSlug} · X {h.x}% · Y {h.y}% · {h.active ? 'Active' : 'Inactive'}</div>
+                      </div>
+                      <div className="admin-actions">
+                        <button className="btn" type="button" onClick={() => { setEditingHotspotId(h.id); setHotspotDraft({ label: h.label, targetSlug: h.targetSlug, x: h.x, y: h.y, active: h.active }); }}>Edit</button>
+                        <button className="btn btn-danger" type="button" onClick={async () => { if (!window.confirm('Delete this hotspot?')) return; await api.admin.deleteHotspot(h.id); await loadExperienceVisual(experienceVisualId); setError('Hotspot deleted.'); }}>Delete</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           )}
@@ -2096,12 +2163,23 @@ export default function Admin() {
                     const code = String(fd.get('code') || '').trim();
                     const type = String(fd.get('discountType') || 'PERCENT');
                     const value = Number(fd.get('value') || 0);
+                     const minimumSubtotalRupees = Number(fd.get('minimumSubtotal') || 0);
+                     const maximumDiscountRupees = Number(fd.get('maximumDiscount') || 0);
+                     const usageLimitRaw = String(fd.get('usageLimit') || '').trim();
                     if (!code || !value) return;
                     try {
+                      if (type === 'PERCENT' && (!Number.isInteger(value) || value > 100)) {
+                        setError('Percentage coupon value must be a whole number from 1 to 100.');
+                        return;
+                      }
                       await api.admin.createCoupon({
                         code,
                         discountType: type,
-                        value,
+                        value: type === 'FIXED' ? Math.round(value * 100) : value,
+                        minimumSubtotal: Math.round(minimumSubtotalRupees * 100),
+                        maximumDiscount: Math.round(maximumDiscountRupees * 100),
+                        usageLimit: usageLimitRaw ? Math.max(1, Number(usageLimitRaw)) : null,
+                        perCustomerUsageLimit: (() => { const raw = String(fd.get('perCustomerUsageLimit') || '').trim(); return raw ? Math.max(1, Number(raw)) : null; })(),
                         active: true,
                       });
                       setCouponItems(await api.admin.coupons());
@@ -2127,9 +2205,13 @@ export default function Admin() {
                     type="number"
                     min="0"
                     step="0.01"
-                    placeholder="Value"
+                    placeholder="Value (₹ for fixed, % for percent)"
                     required
                   />
+                  <input name="minimumSubtotal" className="field" type="number" min="0" step="0.01" placeholder="Min order ₹ (optional)" />
+                  <input name="maximumDiscount" className="field" type="number" min="0" step="0.01" placeholder="Max discount ₹ (optional)" />
+                  <input name="usageLimit" className="field" type="number" min="1" step="1" placeholder="Usage limit (optional)" />
+                  <input name="perCustomerUsageLimit" className="field" type="number" min="1" step="1" placeholder="Per-customer limit (optional)" />
                   <button className="btn btn-orange" type="submit">
                     Add coupon
                   </button>
@@ -2140,7 +2222,7 @@ export default function Admin() {
                       <strong>{c.code}</strong>
                       <small>
                         {c.discountType} {c.value} · used {c.usedCount || 0}/
-                        {c.usageLimit ?? '∞'} · {c.active ? 'Active' : 'Hidden'}
+                        {c.usageLimit ?? '∞'} · {c.perCustomerUsageLimit ? `${c.perCustomerUsageLimit}/customer` : 'no customer cap'} · {c.active ? 'Active' : 'Hidden'}
                       </small>
                     </span>
                     <button
@@ -2164,24 +2246,66 @@ export default function Admin() {
                         Order {r.orderId} · {r.reason}
                       </small>
                     </span>
-                    <select
-                      value={r.status}
-                      onChange={async (e) => {
-                        await api.admin.updateReturn(r.id, {
-                          status: e.target.value,
-                          refundAmount: Number(r.refundAmount || 0),
-                          refundStatus: r.refundStatus || 'PENDING',
-                          adminNote: r.adminNote || '',
-                        });
-                        setReturnItems(await api.admin.returns());
-                      }}
-                    >
-                      <option>PENDING</option>
-                      <option>APPROVED</option>
-                      <option>REJECTED</option>
-                      <option>RECEIVED</option>
-                      <option>COMPLETED</option>
-                    </select>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                      <select
+                        value={r.status}
+                        onChange={async (e) => {
+                          const nextStatus = e.target.value;
+                          await api.admin.updateReturn(r.id, {
+                            status: nextStatus,
+                            refundAmount: Number(r.refundAmount || 0),
+                            refundStatus: r.refundStatus || 'PENDING',
+                            adminNote: r.adminNote || '',
+                          });
+                          setReturnItems(await api.admin.returns());
+                        }}
+                      >
+                        <option>PENDING</option>
+                        <option>APPROVED</option>
+                        <option>REJECTED</option>
+                        <option>RECEIVED</option>
+                        <option>COMPLETED</option>
+                      </select>
+                      <select
+                        aria-label={`Refund status for return ${r.id}`}
+                        value={r.refundStatus || 'PENDING'}
+                        onChange={async (e) => {
+                          await api.admin.updateReturn(r.id, {
+                            status: r.status,
+                            refundAmount: Number(r.refundAmount || 0),
+                            refundStatus: e.target.value,
+                            adminNote: r.adminNote || '',
+                          });
+                          setReturnItems(await api.admin.returns());
+                        }}
+                      >
+                        <option value="NOT_REQUESTED">NOT_REQUESTED</option>
+                        <option value="PENDING">PENDING</option>
+                        <option value="PROCESSING">PROCESSING</option>
+                        <option value="REFUNDED">REFUNDED</option>
+                        <option value="FAILED">FAILED</option>
+                      </select>
+                      <input
+                        className="field"
+                        style={{ width: 120 }}
+                        aria-label={`Refund amount in rupees for return ${r.id}`}
+                        placeholder="₹0.00"
+                        type="number"
+                        min={0}
+                        step={0.01}
+                        value={(Number(r.refundAmount || 0) / 100).toFixed(2)}
+                        onChange={e => setReturnItems(items => items.map(x => x.id === r.id ? { ...x, refundAmount: Math.round((Number(e.target.value) || 0) * 100) } : x))}
+                        onBlur={async () => {
+                          await api.admin.updateReturn(r.id, {
+                            status: r.status,
+                            refundAmount: Number(r.refundAmount || 0),
+                            refundStatus: r.refundStatus || 'PENDING',
+                            adminNote: r.adminNote || '',
+                          });
+                          setReturnItems(await api.admin.returns());
+                        }}
+                      />
+                    </div>
                   </div>
                 ))}
                 {!returnItems.length && (

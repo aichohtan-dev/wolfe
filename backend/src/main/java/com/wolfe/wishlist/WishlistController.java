@@ -16,12 +16,12 @@ public class WishlistController {
         this.repo = repo;
         this.products = products;
     }
-    @GetMapping("/{customerId}") public List<Product> get(@PathVariable Long customerId, Authentication auth) {
+    @GetMapping("/{customerId}") public List<com.wolfe.catalog.ProductController.ProductPublicView> get(@PathVariable Long customerId, Authentication auth) {
         requireCustomer(auth, customerId);
-        return repo.findByCustomerId(customerId).stream().map(x -> products.findById(x.getProductId()).orElse(null)).filter(Objects::nonNull).filter(Product::isActive).toList();
+        return repo.findByCustomerId(customerId).stream().map(x -> products.findById(x.getProductId()).orElse(null)).filter(Objects::nonNull).filter(Product::isActive).map(com.wolfe.catalog.ProductController.ProductPublicView::new).toList();
     }
     @GetMapping("/{customerId}/slugs") public List<String> getSlugs(@PathVariable Long customerId, Authentication auth) {
-        return get(customerId, auth).stream().map(Product::getSlug).toList();
+        return get(customerId, auth).stream().map(com.wolfe.catalog.ProductController.ProductPublicView::slug).toList();
     }
     @PutMapping("/{customerId}/{slug}") public List<String> add(@PathVariable Long customerId, @PathVariable String slug, Authentication auth) {
         requireCustomer(auth, customerId);

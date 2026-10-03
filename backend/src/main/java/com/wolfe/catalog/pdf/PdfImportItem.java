@@ -141,7 +141,10 @@ public class PdfImportItem {
     public OffsetDateTime getCreatedAt() { return createdAt; }
 
     public void setStatus(String status) { this.status = status; }
+    public void setBrand(String brand) { this.brand = brand; }
+    public void setCategory(String category) { this.category = category; }
     public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
+    public void setMediaUrls(String mediaUrls) { this.mediaUrls = mediaUrls; }
     public void setDuplicateProductId(Long duplicateProductId) { this.duplicateProductId = duplicateProductId; }
 
     public void updateDetails(String name, String sku, String brand, String category, String subcategory,

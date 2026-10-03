@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useSeo } from '../../hooks/useSeo';
 import { api, type Customer } from '../../api';
+import { TurnstileWidget } from '../../components/security/TurnstileWidget';
 
 export function CustomDesign({ user }: {
     user: Customer | null;
@@ -9,11 +10,12 @@ export function CustomDesign({ user }: {
     const [form, setForm] = useState({ projectName: '', requirements: '', referenceImageUrl: '' });
     const [hp, setHp] = useState('');
     const [sent, setSent] = useState(false);
+    const [captchaToken, setCaptchaToken] = useState('');
 
     const submit = async (e: any) => {
         e.preventDefault();
         if (!user || hp) return;
-        await api.customDesign.create(user.id, form);
+        await api.customDesign.create(user.id, {...form, captchaToken});
         setSent(true);
     };
 
@@ -54,6 +56,7 @@ export function CustomDesign({ user }: {
                         placeholder="Reference image URL (optional)"
                         className="field"
                     />
+                    <TurnstileWidget onToken={setCaptchaToken} />
                     <button className="btn btn-orange">Submit design request</button>
                 </form>
             )}

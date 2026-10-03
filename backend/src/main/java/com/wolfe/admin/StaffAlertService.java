@@ -1,0 +1,1 @@
+package com.wolfe.admin; import org.springframework.stereotype.Service; @Service public class StaffAlertService { private final StaffAlertRepository repo; public StaffAlertService(StaffAlertRepository repo){this.repo=repo;} public StaffAlert lead(String type,String subject,String message){return repo.save(new StaffAlert(type,subject,message));} }

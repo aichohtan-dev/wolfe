@@ -9,7 +9,7 @@ Premium home & hardware commerce platform.
 - Redis
 - Docker Compose
 - Product catalog API: `/api/v1/products`
-- Swagger UI: `/swagger-ui.html`
+- Swagger UI: `/swagger-ui.html` is available only when the Maven `openapi` profile and `WOLFE_OPENAPI_ENABLED=true` are explicitly enabled.
 
 ## Run frontend
 ```bash
@@ -139,3 +139,9 @@ docker compose up -d --build
 - `npm run typecheck`: Validates TypeScript types across storefront
 - `npm run build`: Generates optimized Vite production bundle
 - `git diff --check`: Verifies no trailing whitespace or git conflicts
+
+## Security baseline
+- Production authentication cookies are Secure/HttpOnly/SameSite=Strict by default; set `WOLFE_SECURE_COOKIES=false` only for explicit local HTTP development.
+- Retailer fulfillment is append-only across reassignment; historical A -> B -> A rows are preserved.
+- Production images and GitHub Actions are pinned to immutable digests/SHAs.
+- PDFBox is pinned to 3.0.8.

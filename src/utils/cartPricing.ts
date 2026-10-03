@@ -6,7 +6,7 @@ export function cartUnitPrice(p: any, item: CartItem, configs: Record<string, an
         if (cfg && Number.isFinite(Number(cfg.basePrice))) {
             return (Number(cfg.basePrice) + Number(cfg.addonPrice || 0)) / 100;
         }
-        return Number(p?.price || 0) + Number(cfg?.addonPrice || 0) / 100;
+        return Number(p?.price || 0);
     }
     if (item.variantPrice && Number.isFinite(Number(item.variantPrice))) {
         return Number(item.variantPrice);

@@ -1,6 +1,9 @@
 services:
   postgres:
-    image: postgres:16-alpine
+    restart: unless-stopped
+    cpus: "1.0"
+    mem_limit: 768m
+    image: ${POSTGRES_IMAGE:?Set POSTGRES_IMAGE to an immutable postgres@sha256 digest}
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-wolfe}
       POSTGRES_USER: ${POSTGRES_USER:-wolfe}
@@ -8,6 +11,10 @@ services:
     expose: ["5432"]
     volumes:
       - wolfe-postgres:/var/lib/postgresql/data
+    security_opt: ["no-new-privileges:true"]
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
     healthcheck:
       test: ["CMD-SHELL","pg_isready -U ${POSTGRES_USER:-wolfe} -d ${POSTGRES_DB:-wolfe}"]
       interval: 5s
@@ -15,13 +22,31 @@ services:
       retries: 10
 
   redis:
-    image: redis:7-alpine
-    command: ["redis-server","--appendonly","yes"]
-    expose: ["6379"]
+    restart: unless-stopped
+    cpus: "0.5"
+    mem_limit: 256m
+    image: ${REDIS_IMAGE:?Set REDIS_IMAGE to an immutable redis@sha256 digest}
+    entrypoint: ["/bin/sh", "/opt/wolfe/redis-entrypoint.sh"]
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD in the environment or .env}
     volumes:
       - wolfe-redis:/data
+      - ./ops/redis-entrypoint.sh:/opt/wolfe/redis-entrypoint.sh:ro
+    security_opt: ["no-new-privileges:true"]
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
+    expose: ["6379"]
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli --user wolfe -a \"$${REDIS_PASSWORD}\" ping | grep PONG"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
 
   api:
+    restart: unless-stopped
+    cpus: "2.0"
+    mem_limit: 1g
     build:
       context: .
       dockerfile: Dockerfile.backend
@@ -30,25 +55,62 @@ services:
       DATABASE_USERNAME: ${POSTGRES_USER:-wolfe}
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the environment or .env}
       REDIS_URL: redis://redis:6379
+      REDIS_USERNAME: wolfe
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?Set REDIS_PASSWORD in the environment or .env}
       WOLFE_JWT_SECRET: ${WOLFE_JWT_SECRET:?Set WOLFE_JWT_SECRET in the environment or .env}
       WOLFE_JWT_TTL_SECONDS: ${WOLFE_JWT_TTL_SECONDS:-900}
       WOLFE_FRONTEND_ORIGIN: ${WOLFE_FRONTEND_ORIGIN:?Set WOLFE_FRONTEND_ORIGIN in the environment or .env}
+      WOLFE_FRONTEND_ORIGINS: ${WOLFE_FRONTEND_ORIGINS:-}
+      WOLFE_SERVER_NAME: ${WOLFE_SERVER_NAME:-localhost}
+      WOLFE_PUBLIC_BASE_URL: ${WOLFE_PUBLIC_BASE_URL:?Set WOLFE_PUBLIC_BASE_URL in the environment or .env}
+      WOLFE_SECURE_COOKIES: ${WOLFE_SECURE_COOKIES:-true}
+      WOLFE_CAPTCHA_REQUIRED: ${WOLFE_CAPTCHA_REQUIRED:-true}
+      WOLFE_CAPTCHA_SECRET: ${WOLFE_CAPTCHA_SECRET:-}
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+    read_only: true
+    tmpfs: ["/tmp"]
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
     depends_on:
       postgres:
         condition: service_healthy
       redis:
-        condition: service_started
+        condition: service_healthy
     expose: ["8080"]
+    volumes:
+      - wolfe-catalog-imports:/app/public/catalog/imports
+      - wolfe-catalog-published:/app/public/catalog/published
 
   frontend:
+    restart: unless-stopped
+    cpus: "1.0"
+    mem_limit: 256m
     build:
       context: .
       dockerfile: Dockerfile.frontend
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: ["ALL"]
+    cap_add: ["NET_BIND_SERVICE"]
+    read_only: true
+    tmpfs: ["/var/cache/nginx", "/var/run", "/etc/nginx/conf.d"]
+    logging:
+      driver: json-file
+      options: {max-size: "10m", max-file: "3"}
     depends_on:
-      - api
+      api:
+        condition: service_healthy
+    environment:
+      WOLFE_SERVER_NAME: ${WOLFE_SERVER_NAME:-localhost}
     ports:
       - "80:80"
+      - "443:443"
+    volumes:
+      - ./ops/certs:/etc/nginx/certs:ro
 
 volumes:
   wolfe-postgres:
   wolfe-redis:
+  wolfe-catalog-imports:
+  wolfe-catalog-published:

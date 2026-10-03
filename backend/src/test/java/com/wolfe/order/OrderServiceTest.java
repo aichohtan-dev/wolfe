@@ -54,7 +54,7 @@ class OrderServiceTest {
     }
 
     @Test
-    void standardShippingIsFreeAtThreshold() {
+    void standardShippingIsFreeAtPostDiscountThreshold() {
         assertEquals(0L, service.shippingFee(250_000L, "STANDARD"));
     }
 

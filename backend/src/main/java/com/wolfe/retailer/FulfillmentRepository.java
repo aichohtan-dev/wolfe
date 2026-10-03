@@ -10,8 +10,16 @@ import java.util.Optional;
 
 @Repository
 public interface FulfillmentRepository extends JpaRepository<Fulfillment, Long> {
-    Optional<Fulfillment> findByOrderId(String orderId);
-    Optional<Fulfillment> findByOrderIdAndRetailerId(String orderId, Long retailerId);
+    @org.springframework.data.jpa.repository.Lock(jakarta.persistence.LockModeType.PESSIMISTIC_WRITE)
+    @org.springframework.data.jpa.repository.Query("select f from Fulfillment f where f.orderId = :orderId order by f.id desc")
+    List<Fulfillment> findByOrderIdForUpdateRows(@org.springframework.data.repository.query.Param("orderId") String orderId);
+
+    default Optional<Fulfillment> findByOrderIdForUpdate(String orderId) {
+        return findByOrderIdForUpdateRows(orderId).stream().findFirst();
+    }
+    Optional<Fulfillment> findTopByOrderIdOrderByIdDesc(String orderId);
+    default Optional<Fulfillment> findByOrderId(String orderId) { return findTopByOrderIdOrderByIdDesc(orderId); }
+    Optional<Fulfillment> findTopByOrderIdAndRetailerIdOrderByIdDesc(String orderId, Long retailerId);
     List<Fulfillment> findByRetailerId(Long retailerId);
     Page<Fulfillment> findByRetailerId(Long retailerId, Pageable pageable);
     List<Fulfillment> findByRetailerIdAndStatus(Long retailerId, String status);
