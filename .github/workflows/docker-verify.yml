@@ -48,6 +48,7 @@ jobs:
         run: |
           mkdir -p ops/certs
           openssl req -x509 -nodes -newkey rsa:2048 -days 1 -keyout ops/certs/privkey.pem -out ops/certs/fullchain.pem -subj "/CN=localhost"
+          chmod 644 ops/certs/privkey.pem ops/certs/fullchain.pem
 
       - name: Start Docker Stack
         run: docker compose up -d
