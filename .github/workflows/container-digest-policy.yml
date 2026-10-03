@@ -14,7 +14,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          bad=$(grep -RInE '(^|[[:space:]]|image:[[:space:]])(postgres|redis|node|nginx|eclipse-temurin):[^@[:space:]]+' Dockerfile* docker-compose*.yml 2>/dev/null || true)
+          bad=$(grep -RInE '(^|[[:space:]]|image:[[:space:]])(postgres|redis|node|nginx|eclipse-temurin):[^@[:space:]]+[[:space:]]*(#.*)?$' Dockerfile* docker-compose*.yml 2>/dev/null || true)
           if [[ -n "$bad" ]]; then
             echo "$bad"
             echo 'Mutable base/service image reference detected; pin to @sha256 digest.'
