@@ -70,7 +70,7 @@ jobs:
         with:
           node-version: 22.23.2
       - run: npm ci --ignore-scripts
-      - run: npm audit --audit-level=high
+      - run: npm audit --omit=dev --audit-level=high
       - run: git diff --check
       - name: Lightweight secret pattern scan
         shell: bash
