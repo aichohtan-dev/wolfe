@@ -80,4 +80,5 @@ jobs:
             echo "Potential credential material detected."
             exit 1
           fi
+      - run: chmod +x backend/mvnw
       - run: ./backend/mvnw -q -DskipTests dependency:analyze
