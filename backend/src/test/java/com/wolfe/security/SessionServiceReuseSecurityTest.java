@@ -19,6 +19,7 @@ class SessionServiceReuseSecurityTest {
         var c = new Customer("Test", "test@example.com", "hash");
         setId(c, 42L);
         var old = new RefreshToken(42L, SessionService.hash("stolen"), Instant.now().plusSeconds(3600));
+        old.revoke();
 
         when(repo.findByTokenHashForUpdate(anyString())).thenReturn(Optional.of(old));
         when(customers.findByIdForUpdate(42L)).thenReturn(Optional.of(c));
