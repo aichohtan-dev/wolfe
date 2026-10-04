@@ -12,6 +12,6 @@ class RateLimitServiceContractTest {
             java.nio.file.Paths.get("src/main/java/com/wolfe/customer/CustomerController.java")
         ));
         org.junit.jupiter.api.Assertions.assertTrue(source.contains("request.getRemoteAddr()"));
-        org.junit.jupiter.api.Assertions.assertFalse(source.contains("getHeader("X-Forwarded-For")"));
+        org.junit.jupiter.api.Assertions.assertFalse(source.contains("getHeader(\"X-Forwarded-For\")"));
     }
 }
