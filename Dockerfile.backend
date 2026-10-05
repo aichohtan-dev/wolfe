@@ -4,7 +4,7 @@ RUN apk add --no-cache curl unzip
 COPY backend/.mvn .mvn
 COPY backend/mvnw backend/mvnw.cmd backend/pom.xml ./
 COPY backend/src src
-RUN chmod +x mvnw && ./mvnw -q -Pdocker test && ./mvnw -q -Pdocker package -DskipTests=false
+RUN chmod +x mvnw && ./mvnw -q -Pdocker test -DexcludedGroups=integration && ./mvnw -q -Pdocker package -DskipTests=false
 
 FROM eclipse-temurin:21-jre-alpine@sha256:1a29e1fe337eb28b5bec30f0ee8ed29f0ff80ab6f75dcf9313efe82911065a52
 WORKDIR /app
