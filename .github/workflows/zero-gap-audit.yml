@@ -1,0 +1,35 @@
+name: Wolfe Zero-Gap 20-Agent Audit
+
+on:
+  workflow_dispatch:
+    inputs:
+      start_stage:
+        description: "Roadmap stage to start from"
+        required: true
+        default: "G0"
+        type: choice
+        options: [G0,G1,G2,G3,G4,G5,G6,G7,G8,G9,G10,G11,G12,G13]
+      dry_run:
+        description: "Validate orchestration prerequisites without model execution"
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+jobs:
+  orchestrator:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate orchestrator
+        run: python3 audit/orchestrator/run.py
+        env:
+          OPENAI_API_KEY: ${{ inputs.dry_run && '' || secrets.OPENAI_API_KEY }}
+      - name: Report selected stage
+        run: |
+          echo "Zero-Gap start stage: ${{ inputs.start_stage }}"
+          echo "Dry run: ${{ inputs.dry_run }}"
+          echo "This control plane is fail-closed; no certification is emitted by configuration validation alone."
