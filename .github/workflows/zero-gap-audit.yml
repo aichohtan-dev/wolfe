@@ -28,8 +28,9 @@ jobs:
         run: python3 audit/orchestrator/run.py
         env:
           OPENAI_API_KEY: ${{ inputs.dry_run && '' || secrets.OPENAI_API_KEY }}
+          ZERO_GAP_DRY_RUN: ${{ inputs.dry_run }}
       - name: Report selected stage
         run: |
           echo "Zero-Gap start stage: ${{ inputs.start_stage }}"
           echo "Dry run: ${{ inputs.dry_run }}"
-          echo "This control plane is fail-closed; no certification is emitted by configuration validation alone."
+          echo "No certification is emitted by configuration validation alone."
