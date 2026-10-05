@@ -12,7 +12,7 @@ public class AdminAuditInterceptor implements HandlerInterceptor {
     public AdminAuditInterceptor(AdminAuditLogRepository repo){this.repo=repo;}
     @Override public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) {
         String path=request.getRequestURI();
-        if (!path.startsWith("/api/v1/admin/") || "GET".equalsIgnoreCase(request.getMethod())) return;
+        if (!path.startsWith("/api/v1/admin/")) return;
         Authentication auth=org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
         if (auth==null || !auth.isAuthenticated()) return;
         Long actorId=null;
