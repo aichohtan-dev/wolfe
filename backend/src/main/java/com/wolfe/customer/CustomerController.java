@@ -89,7 +89,12 @@ public class CustomerController {
         Customer c = repo.save(new Customer(r.name().trim(), normalizedEmail, encodedPassword));
         c.markEmailUnverified();
         repo.save(c);
-        lifecycle.sendVerification(c.getId());
+        try {
+            lifecycle.sendVerification(c.getId());
+        } catch (RuntimeException ex) {
+            log.error("Registration email delivery failed for customerId={}", c.getId(), ex);
+            return ResponseEntity.accepted().body(Map.of("message", "If registration is available for the submitted details, the account is now available. Please sign in."));
+        }
         rateLimits.clear("register", normalizedEmail, clientIp(request));
         return ResponseEntity.accepted().body(Map.of(
                 "message", "If registration is available for the submitted details, the account is now available. Please sign in."
@@ -136,9 +141,9 @@ public class CustomerController {
     }
     public record PasswordResetRequest(@Email @NotBlank @Pattern(regexp = "^[^@\\s]+@[^@\\s]+\\.[A-Za-z]{2,63}$") @Size(max=254) String email) {}
     public record PasswordResetConfirm(@NotBlank String token, @NotBlank @Size(min=8,max=72) String newPassword) {}
-    @PostMapping("/verify-email/request") ResponseEntity<?> requestEmailVerification(@Valid @RequestBody PasswordResetRequest r, HttpServletRequest request) { rateLimits.check("verify-email", r.email(), clientIp(request)); lifecycle.sendVerification(repo.findByEmailIgnoreCase(r.email().trim().toLowerCase()).map(Customer::getId).orElse(null)); return ResponseEntity.accepted().body(Map.of("message","If the account exists, a verification message has been sent.")); }
+    @PostMapping("/verify-email/request") ResponseEntity<?> requestEmailVerification(@Valid @RequestBody PasswordResetRequest r, HttpServletRequest request) { rateLimits.check("verify-email", r.email(), clientIp(request)); try { lifecycle.sendVerification(repo.findByEmailIgnoreCase(r.email().trim().toLowerCase()).map(Customer::getId).orElse(null)); } catch (RuntimeException ex) { log.error("Verification email delivery failed", ex); } return ResponseEntity.accepted().body(Map.of("message","If the account exists, a verification message has been sent.")); }
     @PostMapping("/verify-email/confirm") ResponseEntity<?> confirmEmail(@RequestParam String token) { return lifecycle.verifyEmail(token) ? ResponseEntity.noContent().build() : ResponseEntity.badRequest().body(Map.of("error","INVALID_TOKEN","message","Verification link is invalid or expired.")); }
-    @PostMapping("/password-reset/request") ResponseEntity<?> requestReset(@Valid @RequestBody PasswordResetRequest r, HttpServletRequest request) { rateLimits.check("password-reset", r.email(), clientIp(request)); lifecycle.requestPasswordReset(r.email()); return ResponseEntity.accepted().body(Map.of("message","If the account exists, a password reset message has been sent.")); }
+    @PostMapping("/password-reset/request") ResponseEntity<?> requestReset(@Valid @RequestBody PasswordResetRequest r, HttpServletRequest request) { rateLimits.check("password-reset", r.email(), clientIp(request)); try { lifecycle.requestPasswordReset(r.email()); } catch (RuntimeException ex) { log.error("Password reset email delivery failed", ex); } return ResponseEntity.accepted().body(Map.of("message","If the account exists, a password reset message has been sent.")); }
     @PostMapping("/password-reset/confirm") ResponseEntity<?> confirmReset(@Valid @RequestBody PasswordResetConfirm r, HttpServletRequest request) { rateLimits.check("password-reset-confirm", clientIp(request), clientIp(request)); validatePasswordBytes(r.newPassword()); return lifecycle.resetPassword(r.token(), encoder.encode(r.newPassword())) ? ResponseEntity.noContent().build() : ResponseEntity.badRequest().body(Map.of("error","INVALID_TOKEN","message","Reset link is invalid or expired.")); }
     @GetMapping("/sessions") java.util.List<SessionService.SessionInfo> sessions(Authentication auth) { return sessions.listActive((Long) auth.getDetails()); }
     @DeleteMapping("/sessions/{sessionId}") ResponseEntity<?> revokeSession(@PathVariable Long sessionId, Authentication auth) { sessions.revokeOne((Long) auth.getDetails(), sessionId); return ResponseEntity.noContent().build(); }

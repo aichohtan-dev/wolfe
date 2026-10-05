@@ -57,6 +57,15 @@ import static com.wolfe.security.CustomerAccess.requireCustomer;
         reviews.delete(review);
     }
 
+    @GetMapping("/product/{slug}/mine") public ReviewView mine(@PathVariable String slug, Authentication auth) {
+        Long cid = requireCustomer(auth);
+        var p = products.findBySlugIgnoreCase(slug.trim()).filter(ProductReviewController::activeProduct)
+                .orElseThrow(() -> new NoSuchElementException("Product not found"));
+        return reviews.findByProductIdAndCustomerId(p.getId(), cid)
+                .map(ReviewView::new)
+                .orElseThrow(() -> new NoSuchElementException("Review not found"));
+    }
+
     @PostMapping("/product/{slug}") public ReviewView create(@PathVariable String slug, @Valid @RequestBody CreateReview r, Authentication auth, HttpServletRequest request) {
         if (auth == null || !(auth.getDetails() instanceof Long cid)) throw new org.springframework.security.access.AccessDeniedException("Customer authentication required");
         rateLimits.check("review", String.valueOf(cid), request.getRemoteAddr());

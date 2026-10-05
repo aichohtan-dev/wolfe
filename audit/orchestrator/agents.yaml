@@ -1,0 +1,85 @@
+version: 1
+baseline: V49
+roadmap: [G0,G1,G2,G3,G4,G5,G6,G7,G8,G9,G10,G11,G12,G13]
+agents:
+  - id: 01
+    name: Security Architect
+    wave: 1
+    stages: [G1,G3,G10,G12]
+  - id: 02
+    name: Application Security Engineer
+    wave: 1
+    stages: [G2,G3,G6,G7,G8,G10,G11]
+  - id: 03
+    name: Penetration Tester
+    wave: 1
+    stages: [G3,G5,G6,G8,G10,G11]
+  - id: 04
+    name: Cloud Security Architect
+    wave: 1
+    stages: [G1,G10,G12]
+  - id: 05
+    name: Compliance Auditor
+    wave: 1
+    stages: [G7,G8,G10,G12]
+  - id: 06
+    name: Backend Architect
+    wave: 2
+    stages: [G1,G4,G5,G6,G9]
+  - id: 07
+    name: Frontend Developer
+    wave: 2
+    stages: [G2,G3,G4,G5,G7,G8,G11]
+  - id: 08
+    name: Senior Developer
+    wave: 2
+    stages: [G1,G2,G3,G4,G5,G6,G7,G8,G9,G10]
+  - id: 09
+    name: DevOps Automator
+    wave: 2
+    stages: [G10,G12]
+  - id: 10
+    name: Infrastructure Maintainer
+    wave: 2
+    stages: [G10,G12]
+  - id: 11
+    name: API Tester
+    wave: 3
+    stages: [G2,G3,G4,G5,G6,G7,G8,G11]
+  - id: 12
+    name: Test Automation Engineer
+    wave: 3
+    stages: [G3,G5,G6,G9,G11]
+  - id: 13
+    name: Performance Benchmarker
+    wave: 3
+    stages: [G4,G5,G6,G9,G11,G12]
+  - id: 14
+    name: Test Results Analyzer
+    wave: 3
+    stages: [G3,G5,G6,G9,G11]
+  - id: 15
+    name: Evidence Collector
+    wave: 3
+    stages: [G0,G1,G2,G3,G4,G5,G6,G7,G8,G9,G10,G11,G12,G13]
+  - id: 16
+    name: Accessibility Auditor
+    wave: 3
+    stages: [G2,G4,G7,G8,G11]
+  - id: 18
+    name: Product Manager
+    wave: 4
+    stages: [G2,G4,G5,G6,G7,G8]
+  - id: 19
+    name: Sprint Prioritizer
+    wave: 4
+    stages: [G0,G1,G2,G3,G4,G5,G6,G7,G8,G9,G10,G11,G12,G13]
+  - id: 20
+    name: UX Architect
+    wave: 4
+    stages: [G2,G4,G5,G7,G8,G11]
+  - id: 17
+    name: Reality Checker
+    wave: 5
+    stages: [G11,G12,G13]
+    independent: true

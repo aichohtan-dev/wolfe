@@ -1,0 +1,22 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "type":"object",
+  "required":["finding_id","g_stage","severity","title","affected","observed","expected","evidence","reproduction","impact","root_cause","recommended_fix","regression_risk","verification_test","status"],
+  "properties":{
+    "finding_id":{"type":"string"},
+    "g_stage":{"type":"string","pattern":"^G([0-9]|1[0-3])$"},
+    "severity":{"enum":["P0","P1","P2","P3"]},
+    "title":{"type":"string"},
+    "affected":{"type":"string"},
+    "observed":{"type":"string"},
+    "expected":{"type":"string"},
+    "evidence":{"type":"array","items":{"type":"string"}},
+    "reproduction":{"type":"array","items":{"type":"string"}},
+    "impact":{"type":"string"},
+    "root_cause":{"type":"string"},
+    "recommended_fix":{"type":"string"},
+    "regression_risk":{"type":"string"},
+    "verification_test":{"type":"string"},
+    "status":{"enum":["NEW","CONFIRMED","FIXED","RETEST-PASS","RETEST-FAIL"]}
+  }
+}

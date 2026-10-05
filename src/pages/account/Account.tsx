@@ -22,6 +22,10 @@ export function Account({ user, onLogin, onLogout }: AccountProps) {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [securityMessage, setSecurityMessage] = useState('');
+  const [resetEmail, setResetEmail] = useState('');
+  const [resetToken, setResetToken] = useState('');
+  const [resetPassword, setResetPassword] = useState('');
+  const [verifyToken, setVerifyToken] = useState(() => new URLSearchParams(window.location.search).get('token') || '');
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,8 +59,29 @@ export function Account({ user, onLogin, onLogout }: AccountProps) {
   };
 
   const revokeSession = async (id: number) => {
-    await api.revokeSession(id);
-    setSessions(v => v.filter(x => x.id !== id));
+    try { await api.revokeSession(id); setSessions(v => v.filter(x => x.id !== id)); }
+    catch (e: any) { setSecurityMessage(e.message || 'Could not revoke session.'); }
+  };
+
+  const verifyEmail = async () => {
+    try { await api.confirmEmailVerification(verifyToken); setSecurityMessage('Email verified successfully.'); setVerifyToken(''); window.history.replaceState({}, '', '/account'); }
+    catch (e: any) { setSecurityMessage(e.message || 'Verification link is invalid or expired.'); }
+  };
+
+  const requestReset = async () => {
+    try { await api.requestPasswordReset(resetEmail); setSecurityMessage('If the account exists, a reset message has been sent.'); }
+    catch (e: any) { setSecurityMessage(e.message || 'Could not request a password reset.'); }
+  };
+
+  const confirmReset = async () => {
+    try { await api.confirmPasswordReset(resetToken, resetPassword); setSecurityMessage('Password reset successfully. Please sign in again.'); setResetToken(''); setResetPassword(''); setMode('login'); }
+    catch (e: any) { setSecurityMessage(e.message || 'Reset link is invalid or expired.'); }
+  };
+
+  const deleteAccount = async () => {
+    if (!window.confirm('Delete your Wolfe account? This disables the account and anonymizes personal data.')) return;
+    try { await api.deleteAccount(); onLogout(); }
+    catch (e: any) { setSecurityMessage(e.message || 'Could not delete account.'); }
   };
 
   if (user) {
@@ -64,6 +89,10 @@ export function Account({ user, onLogin, onLogout }: AccountProps) {
       <main className="container-w section">
         <p className="eyebrow">Customer account</p>
         <h1>Hello, {user.name}</h1>
+        {verifyToken && <div className="account-card" role="status" style={{ marginBottom: 20 }}>
+          <h2>Verify email</h2><p>Confirm the email verification link.</p>
+          <button className="btn btn-light" onClick={verifyEmail}>Verify email</button>
+        </div>}
         {user.emailVerified === false && <div className="account-card" role="status" style={{ marginBottom: 20 }}>
           <h2>Verify your email</h2><p>Verify your email before placing a cash-on-delivery order.</p>
           <button className="btn btn-light" onClick={async () => { await api.requestEmailVerification(user.email); }}>Resend verification email</button>
@@ -102,6 +131,14 @@ export function Account({ user, onLogin, onLogout }: AccountProps) {
             <button className="btn btn-light" disabled={!currentPassword || newPassword.length < 8} onClick={changePassword}>Change password</button>
             {securityMessage && <p role="status">{securityMessage}</p>}
           </div>
+          <h3>Password reset</h3>
+          <div className="login-form">
+            <input className="field" type="email" placeholder="Account email" value={resetEmail} onChange={e => setResetEmail(e.target.value)} />
+            <button className="btn btn-light" disabled={!resetEmail} onClick={requestReset}>Send reset link</button>
+            <input className="field" placeholder="Reset token" value={resetToken} onChange={e => setResetToken(e.target.value)} />
+            <input className="field" type="password" minLength={8} maxLength={72} placeholder="New password" value={resetPassword} onChange={e => setResetPassword(e.target.value)} />
+            <button className="btn btn-light" disabled={!resetToken || resetPassword.length < 8} onClick={confirmReset}>Reset password</button>
+          </div>
           <h3>Active sessions</h3>
           {sessions.length === 0 ? <p>No active refresh sessions.</p> : sessions.map(s => (
             <div key={s.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, marginBottom: 8 }}>
@@ -109,6 +146,9 @@ export function Account({ user, onLogin, onLogout }: AccountProps) {
               <button className="btn btn-light" onClick={() => revokeSession(s.id)}>Revoke</button>
             </div>
           ))}
+          <div style={{ marginTop: 20 }}>
+            <button className="btn btn-light" onClick={deleteAccount}>Delete account</button>
+          </div>
         </section>
       </main>
     );
