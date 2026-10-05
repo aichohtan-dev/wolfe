@@ -14,10 +14,15 @@ export function ReviewPanel({ slug, user }: ReviewPanelProps) {
   const [review, setReview] = useState('');
   const [sent, setSent] = useState(false);
   const [error, setError] = useState('');
+  const [page, setPage] = useState(0);
+  const [mine, setMine] = useState<any | null>(null);
+  const [editingId, setEditingId] = useState<number | null>(null);
 
   useEffect(() => {
-    api.reviews.get(slug).then(setData).catch(() => {});
-  }, [slug, sent]);
+    api.reviews.get(slug, page, 20).then(setData).catch(() => {});
+    if (user) api.reviews.mine(slug).then(setMine).catch(() => setMine(null));
+    else setMine(null);
+  }, [slug, sent, page, user]);
 
   const submit = async (e: any) => {
     e.preventDefault();
@@ -26,7 +31,12 @@ export function ReviewPanel({ slug, user }: ReviewPanelProps) {
       return;
     }
     try {
-      await api.reviews.create(slug, { rating, review });
+      if (editingId != null) {
+        await api.reviews.update(editingId, { rating, review });
+        setEditingId(null);
+      } else {
+        await api.reviews.create(slug, { rating, review });
+      }
       setSent(true);
       setReview('');
       setError('');
@@ -66,9 +76,19 @@ export function ReviewPanel({ slug, user }: ReviewPanelProps) {
           placeholder="Tell us about the product"
           className="field textarea"
         />
-        <button className="btn btn-orange">Submit review</button>
+        <button className="btn btn-orange">{editingId != null ? 'Update review' : 'Submit review'}</button>
+        {mine && <button type="button" className="btn btn-light" onClick={() => { setEditingId(null); setRating(mine.rating); setReview(mine.review); setError(''); }}>Edit my review</button>}
+        {mine && <button type="button" className="btn btn-light" onClick={async () => {
+          try { await api.reviews.remove(mine.id); setMine(null); setSent(v => !v); setError(''); }
+          catch (err: any) { setError(err.message || 'Unable to delete review'); }
+        }}>Delete my review</button>
         {sent && <p className="checkout-login-note">Review submitted for approval.</p>}
-        {error && <p className="error-message">{error}</p>}
+        {data.totalPages > 1 && <div className="admin-actions" style={{ marginTop: 16 }}>
+        <button className="btn btn-light" disabled={page <= 0} onClick={() => setPage(p => Math.max(0, p - 1))}>Previous</button>
+        <span>Page {page + 1} of {data.totalPages}</span>
+        <button className="btn btn-light" disabled={page + 1 >= data.totalPages} onClick={() => setPage(p => p + 1)}>Next</button>
+      </div>}
+      {error && <p className="error-message">{error}</p>}
       </form>
     </section>
   );
