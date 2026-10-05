@@ -660,31 +660,31 @@ public class AdminController {
         return reviews.findAll(org.springframework.data.domain.PageRequest.of(Math.max(0,page), Math.min(Math.max(1,size),100), org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "createdAt"))).getContent().stream().map(ReviewAdminView::new).toList();
     }
     @org.springframework.security.access.prepost.PreAuthorize("hasAuthority('PERM_ADMIN_CATALOG')")
-    @PutMapping("/reviews/{id}/status") public com.wolfe.review.ProductReview reviewStatus(@PathVariable Long id, @RequestBody Map<String, String> body) {
+    @PutMapping("/reviews/{id}/status") public ReviewAdminView reviewStatus(@PathVariable Long id, @RequestBody Map<String, String> body) {
         var r = reviews.findById(id).orElseThrow(() -> new NoSuchElementException("Review not found"));
         String status = body.getOrDefault("status", "PENDING").toUpperCase();
         if (!Set.of("PENDING", "APPROVED", "REJECTED").contains(status))throw new IllegalArgumentException("Invalid review status");
         r.moderate(status);
-        return reviews.save(r);
+        return new ReviewAdminView(reviews.save(r));
     }
     @org.springframework.security.access.prepost.PreAuthorize("hasAuthority('PERM_ADMIN_ORDERS')")
     @GetMapping("/quotes") public List<QuoteAdminView> quotes(@RequestParam(defaultValue="0") int page, @RequestParam(defaultValue="50") int size) {
         return quotes.findAll(org.springframework.data.domain.PageRequest.of(Math.max(0,page), Math.min(Math.max(1,size),100), org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "createdAt"))).getContent().stream().map(QuoteAdminView::new).toList();
     }
     @org.springframework.security.access.prepost.PreAuthorize("hasAuthority('PERM_ADMIN_ORDERS')")
-    @PutMapping("/quotes/{id}/status") public com.wolfe.quote.QuoteRequest quoteStatus(@PathVariable Long id, @RequestBody Map<String, String> body) {
+    @PutMapping("/quotes/{id}/status") public QuoteAdminView quoteStatus(@PathVariable Long id, @RequestBody Map<String, String> body) {
         var q = quotes.findById(id).orElseThrow(() -> new NoSuchElementException("Quote not found"));
         String status = body.getOrDefault("status", "NEW").toUpperCase();
         if (!Set.of("NEW", "CONTACTED", "QUOTED", "CLOSED").contains(status))throw new IllegalArgumentException("Invalid quote status");
         q.status(status);
-        return quotes.save(q);
+        return new QuoteAdminView(quotes.save(q));
     }
     @org.springframework.security.access.prepost.PreAuthorize("hasAuthority('PERM_ADMIN_ORDERS')")
     @GetMapping("/custom-design") public List<CustomDesignAdminView> customDesign(@RequestParam(defaultValue="0") int page, @RequestParam(defaultValue="50") int size) {
         return customDesigns.findAll(org.springframework.data.domain.PageRequest.of(Math.max(0,page), Math.min(Math.max(1,size),100), org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "createdAt"))).getContent().stream().map(CustomDesignAdminView::new).toList();
     }
     @org.springframework.security.access.prepost.PreAuthorize("hasAuthority('PERM_ADMIN_ORDERS')")
-    @PutMapping("/custom-design/{id}/status") public com.wolfe.customdesign.CustomDesignRequest customDesignStatus(@PathVariable Long id,
+    @PutMapping("/custom-design/{id}/status") public CustomDesignAdminView customDesignStatus(@PathVariable Long id,
     @RequestBody Map<String,
     String> body) {
         var d = customDesigns.findById(id).orElseThrow(() -> new NoSuchElementException("Custom design not found"));
@@ -692,7 +692,7 @@ public class AdminController {
         if (!Set.of("NEW", "CONTACTED", "IN_PROGRESS", "COMPLETED",
         "CLOSED").contains(status))throw new IllegalArgumentException("Invalid custom design status");
         d.status(status);
-        return customDesigns.save(d);
+        return new CustomDesignAdminView(customDesigns.save(d));
     }
     @org.springframework.security.access.prepost.PreAuthorize("hasAuthority('PERM_ADMIN_RETURNS')")
     @GetMapping("/returns") public List<ReturnAdminView> returns(@RequestParam(defaultValue="0") int page, @RequestParam(defaultValue="50") int size) {
@@ -701,7 +701,7 @@ public class AdminController {
     public record ReturnDecision(@NotBlank String status, @Min(0) long refundAmount, String refundStatus, @Size(max = 1000) String adminNote) {
     }
     @org.springframework.security.access.prepost.PreAuthorize("hasAuthority('PERM_ADMIN_RETURNS')")
-    @PutMapping("/returns/{id}") @Transactional public com.wolfe.returning.ReturnRequest updateReturn(@PathVariable Long id, @Valid @RequestBody ReturnDecision r) {
+    @PutMapping("/returns/{id}") @Transactional public ReturnAdminView updateReturn(@PathVariable Long id, @Valid @RequestBody ReturnDecision r) {
         var rr = returnRequests.findByIdForUpdate(id).orElseThrow(() -> new NoSuchElementException("Return request not found"));
         String status = r.status().toUpperCase();
         if (!Set.of("PENDING", "APPROVED", "REJECTED", "RECEIVED", "COMPLETED").contains(status))throw new IllegalArgumentException("invalid return status");
