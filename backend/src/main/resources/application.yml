@@ -28,6 +28,10 @@ spring:
       request-timeout: ${WOLFE_ASYNC_REQUEST_TIMEOUT_MS:30000}
   flyway:
     enabled: true
+    validate-on-migrate: true
+    out-of-order: false
+    baseline-on-migrate: false
+    clean-disabled: true
   mail:
     host: ${SPRING_MAIL_HOST:localhost}
     port: ${SPRING_MAIL_PORT:25}
@@ -64,5 +68,3 @@ springdoc:
   swagger-ui:
     enabled: ${WOLFE_OPENAPI_ENABLED:false}
     path: /swagger-ui.html
-
-
