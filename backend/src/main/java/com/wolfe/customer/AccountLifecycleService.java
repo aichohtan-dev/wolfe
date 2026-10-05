@@ -8,11 +8,14 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import com.wolfe.security.SessionService;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class AccountLifecycleService {
+    private static final Logger log = LoggerFactory.getLogger(AccountLifecycleService.class);
     private final AccountTokenRepository tokens; private final CustomerRepository customers; private final org.springframework.beans.factory.ObjectProvider<JavaMailSender> mailProvider; private final SessionService sessions; private final String from; private final String publicBaseUrl; private final SecureRandom random = new SecureRandom();
     public AccountLifecycleService(AccountTokenRepository tokens, CustomerRepository customers, org.springframework.beans.factory.ObjectProvider<JavaMailSender> mailProvider, SessionService sessions,
             @Value("${WOLFE_MAIL_FROM:no-reply@wolfe.local}") String from, @Value("${WOLFE_PUBLIC_BASE_URL:http://localhost}") String publicBaseUrl) {
@@ -68,7 +71,18 @@ public class AccountLifecycleService {
     private void issueAndSend(Long customerId,String type,String subject,String path){
         Customer c=customers.findByIdForUpdate(customerId).orElse(null); if(c==null) return; tokens.deleteByCustomerIdAndType(customerId,type); String raw=randomToken(); tokens.save(new AccountToken(customerId,type,hash(raw),Instant.now().plus(Duration.ofMinutes(30))));
         String link=publicBaseUrl.replaceAll("/$","")+path+"?token="+java.net.URLEncoder.encode(raw,StandardCharsets.UTF_8);
-        try { SimpleMailMessage m=new SimpleMailMessage(); m.setFrom(from); m.setTo(c.getEmail()); m.setSubject(subject); m.setText("Use this secure Wolfe link within 30 minutes: "+link); mailProvider.ifAvailable(sender -> sender.send(m)); } catch(Exception ignored) { /* never leak token through API */ }
+        try {
+            SimpleMailMessage m=new SimpleMailMessage(); m.setFrom(from); m.setTo(c.getEmail()); m.setSubject(subject); m.setText("Use this secure Wolfe link within 30 minutes: "+link);
+            JavaMailSender sender = mailProvider.getIfAvailable();
+            if (sender == null) {
+                log.error("Account lifecycle email delivery unavailable for type={} customerId={}", type, customerId);
+                throw new IllegalStateException("Account email delivery is unavailable");
+            }
+            sender.send(m);
+        } catch (RuntimeException ex) {
+            log.error("Account lifecycle email delivery failed for type={} customerId={}", type, customerId, ex);
+            throw ex;
+        }
     }
     private String randomToken(){byte[] b=new byte[32];random.nextBytes(b);return Base64.getUrlEncoder().withoutPadding().encodeToString(b);}
     private static String hash(String raw){try{return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest((raw==null?"":raw).getBytes(StandardCharsets.UTF_8)));}catch(Exception e){throw new IllegalStateException(e);}}
