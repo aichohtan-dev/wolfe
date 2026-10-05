@@ -50,7 +50,7 @@ class G3RoleMatrixHttpSecurityTest {
     void adminCanPassAdminMatcherButCannotPassRetailerMatcher() throws Exception {
         mvc.perform(get("/api/v1/admin/__g3_authorization_probe__")
                         .with(user("admin").roles("ADMIN")
-                                .authorities("PERM_ADMIN_ORDERS")))
+                                .authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERM_ADMIN_ORDERS"))))
                 .andExpect(status().isNotFound());
         mvc.perform(get("/api/v1/retailer/__g3_authorization_probe__")
                         .with(user("admin").roles("ADMIN")))
@@ -61,7 +61,7 @@ class G3RoleMatrixHttpSecurityTest {
     void superAdminCanPassAdminMatcherButCannotPassRetailerMatcher() throws Exception {
         mvc.perform(get("/api/v1/admin/__g3_authorization_probe__")
                         .with(user("superadmin").roles("SUPER_ADMIN")
-                                .authorities("PERM_ADMIN_ORDERS")))
+                                .authorities(new org.springframework.security.core.authority.SimpleGrantedAuthority("PERM_ADMIN_ORDERS"))))
                 .andExpect(status().isNotFound());
         mvc.perform(get("/api/v1/retailer/__g3_authorization_probe__")
                         .with(user("superadmin").roles("SUPER_ADMIN")))
