@@ -29,6 +29,7 @@ jobs:
         env:
           OPENAI_API_KEY: ${{ inputs.dry_run && '' || secrets.OPENAI_API_KEY }}
           ZERO_GAP_DRY_RUN: ${{ inputs.dry_run }}
+          ZERO_GAP_START_STAGE: ${{ inputs.start_stage }}
       - name: Report selected stage
         run: |
           echo "Zero-Gap start stage: ${{ inputs.start_stage }}"
