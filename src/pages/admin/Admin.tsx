@@ -2168,8 +2168,8 @@ export default function Admin() {
               <h2>Inventory reconciliation</h2>
               {!reconciliation.length ? <p className="empty-state">No inventory discrepancies.</p> : reconciliation.map((x: any, i: number) => (
                 <div className="admin-row" key={x.id ?? i}>
-                  <span>{x.productName || x.name || `Product #${x.productId}`}<small>System: {x.systemQuantity ?? x.expected ?? '—'} · Actual: {x.actualQuantity ?? x.actual ?? '—'}</small></span>
-                  <strong>{x.difference ?? x.delta ?? 'DISCREPANCY'}</strong>
+                  <span>{x.productName || x.name || `Product #${x.productId}`}<small>System: {x.globalAvailable ?? '—'} · Retailer: {x.retailerAvailable ?? '—'}</small></span>
+                  <strong>{x.delta ?? 'DISCREPANCY'}</strong>
                 </div>
               ))}
             </div>
