@@ -19,7 +19,8 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder(12);
     }
 
-    @Bean SecurityFilterChain security(HttpSecurity http, JwtAuthFilter jwt, SecurityEventLogger events) throws Exception {
+    @Bean SecurityFilterChain security(HttpSecurity http, JwtAuthFilter jwt, SecurityEventLogger events,
+                                       CorsConfigurationSource cors) throws Exception {
         http.csrf(c -> c.csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse()))
         .exceptionHandling(e -> e
             .authenticationEntryPoint((req,res,ex) -> { res.setStatus(401); res.setContentType(MediaType.APPLICATION_JSON_VALUE); events.denied(req,401,"authentication_required"); res.getWriter().write("{\"error\":\"UNAUTHORIZED\",\"message\":\"Authentication required\"}"); })
@@ -29,7 +30,7 @@ public class SecurityConfig {
             .addHeaderWriter(new StaticHeadersWriter("Cross-Origin-Opener-Policy", "same-origin"))
             .addHeaderWriter(new StaticHeadersWriter("Cross-Origin-Resource-Policy", "same-origin"))
             .referrerPolicy(r -> r.policy(org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN)))
-        .cors(c -> c.configurationSource(cors()))
+        .cors(c -> c.configurationSource(cors))
         .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .authorizeHttpRequests(a -> a.requestMatchers(
             "/error", "/api/v1/customers/register", "/api/v1/customers/login", "/api/v1/customers/refresh", "/api/v1/customers/logout",
@@ -52,23 +53,15 @@ public class SecurityConfig {
         return http.build();
     }
 
-    private CorsConfigurationSource cors() {
-        return cors(null);
-    }
-
-    private CorsConfigurationSource cors(WolfeSecurityProperties config) {
+    @Bean CorsConfigurationSource corsConfigurationSource(WolfeSecurityProperties config) {
         CorsConfiguration c = new CorsConfiguration();
-        String configuredOrigins = config == null ? "" : config.frontendOrigins();
-        c.setAllowedOrigins(java.util.Arrays.stream(configuredOrigins.split(",")).map(String::trim).filter(v -> !v.isBlank()).distinct().toList());
+        c.setAllowedOrigins(java.util.Arrays.stream(config.frontendOrigins().split(","))
+            .map(String::trim).filter(v -> !v.isBlank()).distinct().toList());
         c.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         c.setAllowCredentials(true);
         c.setAllowedHeaders(List.of("Authorization", "Content-Type", "X-XSRF-TOKEN"));
         UrlBasedCorsConfigurationSource s = new UrlBasedCorsConfigurationSource();
         s.registerCorsConfiguration("/**", c);
         return s;
-    }
-
-    @Bean CorsConfigurationSource corsConfigurationSource(WolfeSecurityProperties config) {
-        return cors(config);
     }
 }
