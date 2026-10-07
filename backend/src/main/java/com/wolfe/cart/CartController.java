@@ -29,20 +29,19 @@ public class CartController {
     private final com.wolfe.inventory.InventoryRepository inventory;
     private final com.wolfe.visual.AccessoryOptionRepository accessories;
 
+    @org.springframework.beans.factory.annotation.Autowired
     public CartController(CartItemRepository repo, ProductRepository products, ProductVariantRepository variants,
-                          BundleRepository bundles, BundleItemRepository bundleItems, ConfigurationService configurations) {
+                          BundleRepository bundles, BundleItemRepository bundleItems, ConfigurationService configurations,
+                          com.wolfe.inventory.InventoryRepository inventory,
+                          com.wolfe.visual.AccessoryOptionRepository accessories) {
         this.repo = repo;
         this.products = products;
         this.variants = variants;
         this.bundles = bundles;
         this.bundleItems = bundleItems;
         this.configurations = configurations;
-        this.inventory = null; this.accessories = null;
-    }
-
-    @org.springframework.beans.factory.annotation.Autowired
-    public CartController(CartItemRepository repo, ProductRepository products, ProductVariantRepository variants, BundleRepository bundles, BundleItemRepository bundleItems, ConfigurationService configurations, com.wolfe.inventory.InventoryRepository inventory, com.wolfe.visual.AccessoryOptionRepository accessories) {
-        this.repo=repo; this.products=products; this.variants=variants; this.bundles=bundles; this.bundleItems=bundleItems; this.configurations=configurations; this.inventory=inventory; this.accessories=accessories;
+        this.inventory = inventory;
+        this.accessories = accessories;
     }
 
     @DeleteMapping("/{customerId}")
