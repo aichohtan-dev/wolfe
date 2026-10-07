@@ -68,7 +68,7 @@ public class OrderService {
                         ProductVariantRepository variants, InventoryRepository inventory,
                         CouponService couponService, CouponRepository coupons,
                         OrderStatusHistoryRepository history, com.wolfe.notification.NotificationService notifications,
-                        com.wolfe.experience.ConfigurationRepository configurations, BundleRepository bundles,
+                        com.wolfe.experience.ConfigurationService configurations, BundleRepository bundles,
                         BundleItemRepository bundleItems, com.wolfe.visual.AccessoryOptionRepository accessoryRepository,
                         com.wolfe.retailer.RetailerAllocationService retailerAllocationService,
                         CustomerRepository customers) {
