@@ -85,6 +85,29 @@ public class ConfigurationService {
         return Integer.parseInt(System.getenv().getOrDefault("WOLFE_CONFIGURATION_TTL_DAYS", "30"));
     }
 
+    public ProductConfiguration resolveForOrder(String token, Long customerId, Long productId) {
+        ProductConfiguration configuration = resolve(token);
+        if (!java.util.Objects.equals(configuration.getProductId(), productId))
+            throw new IllegalArgumentException("configuration does not belong to product");
+        if (configuration.getCustomerId() != null && !java.util.Objects.equals(configuration.getCustomerId(), customerId))
+            throw new org.springframework.security.access.AccessDeniedException("configuration belongs to another customer");
+        return configuration;
+    }
+
+    public long currentAddonPrice(ProductConfiguration configuration, Long productId) {
+        if (!java.util.Objects.equals(configuration.getProductId(), productId))
+            throw new IllegalArgumentException("configuration does not belong to product");
+        if (configuration.getSelectedAccessoryId() == null) return 0;
+        Product product = products.findById(productId)
+                .filter(Product::isActive)
+                .orElseThrow(() -> new java.util.NoSuchElementException("Product not found"));
+        AccessoryOption accessory = accessories.findById(configuration.getSelectedAccessoryId())
+                .filter(AccessoryOption::isActive)
+                .filter(a -> a.getProduct().getId().equals(product.getId()))
+                .orElseThrow(() -> new java.util.NoSuchElementException("Configuration accessory not found"));
+        return toPaise(accessory.getPrice());
+    }
+
     public CurrentPricing currentPricing(ProductConfiguration configuration) {
         Product product = products.findById(configuration.getProductId())
                 .filter(Product::isActive)
