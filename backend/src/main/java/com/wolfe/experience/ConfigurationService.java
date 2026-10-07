@@ -71,17 +71,17 @@ public class ConfigurationService {
                 customerId, productId, selectedAccessoryId, addon, base, normalized));
     }
 
-    public ProductConfiguration resolve(String token, int ttlDays) {
+    public ProductConfiguration resolve(String token) {
         if (token == null || !token.matches("[A-Za-z0-9]{16,64}"))
             throw new java.util.NoSuchElementException("Configuration not found");
         ProductConfiguration configuration = configurations.findByShareToken(token)
                 .orElseThrow(() -> new java.util.NoSuchElementException("Configuration not found"));
-        if (configuration.getCreatedAt().plus(Duration.ofDays(ttlDays)).isBefore(Instant.now()))
+        if (configuration.getCreatedAt().plus(Duration.ofDays(configurationTtlDays())).isBefore(Instant.now()))
             throw new java.util.NoSuchElementException("Configuration not found");
         return configuration;
     }
 
-    public CurrentPricing currentPricing(ProductConfiguration configuration) {
+    private int configurationTtlDays() {\n        return Integer.parseInt(System.getenv().getOrDefault("WOLFE_CONFIGURATION_TTL_DAYS", "30"));\n    }\n\n    public CurrentPricing currentPricing(ProductConfiguration configuration) {
         Product product = products.findById(configuration.getProductId())
                 .filter(Product::isActive)
                 .orElseThrow(() -> new java.util.NoSuchElementException("Product not found"));
