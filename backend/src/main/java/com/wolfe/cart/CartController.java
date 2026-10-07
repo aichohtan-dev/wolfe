@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/v1/cart")
 public class CartController {
     private final CartItemRepository repo;
+    private final CartService cartService;
     private final ProductRepository products;
     private final ProductVariantRepository variants;
     private final BundleRepository bundles;
@@ -33,7 +34,8 @@ public class CartController {
     public CartController(CartItemRepository repo, ProductRepository products, ProductVariantRepository variants,
                           BundleRepository bundles, BundleItemRepository bundleItems, ConfigurationService configurations,
                           com.wolfe.inventory.InventoryRepository inventory,
-                          com.wolfe.visual.AccessoryOptionRepository accessories) {
+                          com.wolfe.visual.AccessoryOptionRepository accessories,
+                          CartService cartService) {
         this.repo = repo;
         this.products = products;
         this.variants = variants;
@@ -42,13 +44,14 @@ public class CartController {
         this.configurations = configurations;
         this.inventory = inventory;
         this.accessories = accessories;
+        this.cartService = cartService;
     }
 
     @DeleteMapping("/{customerId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void clear(@PathVariable Long customerId, Authentication auth) {
         CustomerAccess.requireCustomer(auth, customerId);
-        repo.deleteByCustomerId(customerId);
+        cartService.clear(customerId);
     }
 
     @GetMapping("/{customerId}")
@@ -79,7 +82,6 @@ public class CartController {
     }
 
     @PutMapping("/{customerId}/{slug}")
-    @Transactional
     public CartItemView put(@PathVariable Long customerId, @PathVariable String slug,
                             @RequestParam(defaultValue = "1") int quantity,
                             @RequestParam(required = false) Long variantId,
@@ -87,53 +89,18 @@ public class CartController {
                             @RequestParam(required = false) String configurationToken,
                             Authentication auth) {
         CustomerAccess.requireCustomer(auth, customerId);
-        if (quantity < 1 || quantity > 100) throw new IllegalArgumentException("quantity must be between 1 and 100");
-        Product product = products.findBySlugIgnoreCase(slug.trim())
-                .filter(Product::isActive)
-                .orElseThrow(() -> new IllegalArgumentException("product not found or inactive"));
-        ProductVariant variant = resolveVariant(product, variantId);
-        validateBundle(product, bundleId);
-        if (configurationToken != null && !configurationToken.isBlank()) configurations.resolveForCart(configurationToken.trim(), customerId, product.getId());
-        if (repo.countByCustomerId(customerId) >= 50 && repo.findExact(customerId, product.getId(), variantId, bundleId, blankToNull(configurationToken)).isEmpty()) {
-            throw new IllegalStateException("Cart cannot contain more than 50 distinct items");
-        }
-
-        CartItem item = repo.findExact(customerId, product.getId(), variantId, bundleId, blankToNull(configurationToken))
-                .orElseGet(() -> new CartItem(customerId, product.getId(), variantId, bundleId, blankToNull(configurationToken), quantity));
-        item.setQuantity(quantity);
-        return view(repo.save(item));
+        return view(cartService.put(customerId, slug, quantity, variantId, bundleId, configurationToken));
     }
 
     @DeleteMapping("/{customerId}/{slug}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    @Transactional
     public void remove(@PathVariable Long customerId, @PathVariable String slug,
                        @RequestParam(required = false) Long variantId,
                        @RequestParam(required = false) Long bundleId,
                        @RequestParam(required = false) String configurationToken,
                        Authentication auth) {
         CustomerAccess.requireCustomer(auth, customerId);
-        Product product = products.findBySlugIgnoreCase(slug.trim())
-                .orElseThrow(() -> new IllegalArgumentException("product not found"));
-        // Removal must remain possible even after a catalog item is deactivated.
-        // Do not validate active variant/bundle/configuration state on deletion.
-        repo.findExact(customerId, product.getId(), variantId, bundleId, blankToNull(configurationToken)).ifPresent(repo::delete);
-    }
-
-    private ProductVariant resolveVariant(Product product, Long variantId) {
-        if (variantId == null) return null;
-        return variants.findByIdAndActiveTrue(variantId)
-                .filter(v -> Objects.equals(v.getProduct().getId(), product.getId()))
-                .orElseThrow(() -> new IllegalArgumentException("variant not found, inactive, or does not belong to product"));
-    }
-
-    private void validateBundle(Product product, Long bundleId) {
-        if (bundleId == null) return;
-        Bundle bundle = bundles.findById(bundleId).filter(Bundle::isActive)
-                .orElseThrow(() -> new IllegalArgumentException("bundle not found or inactive"));
-        boolean included = bundleItems.findByBundleId(bundleId).stream()
-                .anyMatch(item -> Objects.equals(item.getProductId(), product.getId()));
-        if (!included) throw new IllegalArgumentException("product is not part of the selected bundle");
+        cartService.remove(customerId, slug, variantId, bundleId, configurationToken);
     }
 
     private CartItemView view(CartItem item) { return view(item, null, null, null, null, null, null, null); }
