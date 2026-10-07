@@ -94,6 +94,10 @@ public class ConfigurationService {
         return configuration;
     }
 
+    public ProductConfiguration resolveForCart(String token, Long customerId, Long productId) {
+        return resolveForOrder(token, customerId, productId);
+    }
+
     public long currentAddonPrice(ProductConfiguration configuration, Long productId) {
         if (!java.util.Objects.equals(configuration.getProductId(), productId))
             throw new IllegalArgumentException("configuration does not belong to product");
