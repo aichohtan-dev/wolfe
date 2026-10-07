@@ -8,13 +8,10 @@ import com.wolfe.bundle.Bundle;
 import com.wolfe.bundle.BundleRepository;
 import com.wolfe.bundle.BundleItemRepository;
 import com.wolfe.experience.ConfigurationService;
-import com.wolfe.experience.ProductConfiguration;
 import com.wolfe.security.CustomerAccess;
 import java.util.*;
 import org.springframework.http.HttpStatus;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -28,13 +25,11 @@ public class CartController {
     private final BundleItemRepository bundleItems;
     private final ConfigurationService configurations;
     private final com.wolfe.inventory.InventoryRepository inventory;
-    private final com.wolfe.visual.AccessoryOptionRepository accessories;
 
     @org.springframework.beans.factory.annotation.Autowired
     public CartController(CartItemRepository repo, ProductRepository products, ProductVariantRepository variants,
                           BundleRepository bundles, BundleItemRepository bundleItems, ConfigurationService configurations,
                           com.wolfe.inventory.InventoryRepository inventory,
-                          com.wolfe.visual.AccessoryOptionRepository accessories,
                           CartService cartService) {
         this.repo = repo;
         this.products = products;
@@ -43,7 +38,6 @@ public class CartController {
         this.bundleItems = bundleItems;
         this.configurations = configurations;
         this.inventory = inventory;
-        this.accessories = accessories;
         this.cartService = cartService;
     }
 
@@ -76,9 +70,7 @@ public class CartController {
                 // Stale/expired configuration is represented as unavailable in the cart view.
             }
         }
-        var accessoryIds = configMap.values().stream().map(com.wolfe.experience.ProductConfiguration::getSelectedAccessoryId).filter(java.util.Objects::nonNull).collect(java.util.stream.Collectors.toSet());
-        var accessoryMap = accessories == null ? Map.<Long, com.wolfe.visual.AccessoryOption>of() : accessories.findAllById(accessoryIds).stream().collect(java.util.stream.Collectors.toMap(com.wolfe.visual.AccessoryOption::getId, java.util.function.Function.identity()));
-        return rows.stream().map(i -> view(i, productMap, variantMap, bundleMap, bundleItemMap, inventoryMap, configMap, accessoryMap)).toList();
+        return rows.stream().map(i -> view(i, productMap, variantMap, bundleMap, bundleItemMap, inventoryMap, configMap)).toList();
     }
 
     @PutMapping("/{customerId}/{slug}")
@@ -103,9 +95,9 @@ public class CartController {
         cartService.remove(customerId, slug, variantId, bundleId, configurationToken);
     }
 
-    private CartItemView view(CartItem item) { return view(item, null, null, null, null, null, null, null); }
+    private CartItemView view(CartItem item) { return view(item, null, null, null, null, null, null); }
 
-    private CartItemView view(CartItem item, Map<Long, Product> productMap, Map<Long, ProductVariant> variantMap, Map<Long, Bundle> bundleMap, Map<Long, List<com.wolfe.bundle.BundleItem>> bundleItemMap, Map<Long, com.wolfe.inventory.Inventory> inventoryMap, Map<String, com.wolfe.experience.ProductConfiguration> configMap, Map<Long, com.wolfe.visual.AccessoryOption> accessoryMap) {
+    private CartItemView view(CartItem item, Map<Long, Product> productMap, Map<Long, ProductVariant> variantMap, Map<Long, Bundle> bundleMap, Map<Long, List<com.wolfe.bundle.BundleItem>> bundleItemMap, Map<Long, com.wolfe.inventory.Inventory> inventoryMap, Map<String, com.wolfe.experience.ProductConfiguration> configMap) {
         Product product = productMap == null ? products.findById(item.getProductId()).orElse(null) : productMap.get(item.getProductId());
         ProductVariant variant = item.getVariantId() == null ? null : (variantMap == null ? variants.findById(item.getVariantId()).orElse(null) : variantMap.get(item.getVariantId()));
         Bundle bundle = item.getBundleId() == null ? null : (bundleMap == null ? bundles.findById(item.getBundleId()).orElse(null) : bundleMap.get(item.getBundleId()));
@@ -126,10 +118,10 @@ public class CartController {
                 variant == null ? null : variant.getSize(), variant == null ? null : variant.getFinish(),
                 variant == null ? null : variant.getImageUrl(), variant == null ? null : variant.getPrice(),
                 item.getBundleId(), bundle == null ? null : bundle.getSlug(), bundleUnits, bundleBaseQuantity,
-                item.getConfigurationToken(), item.getQuantity(), effectiveUnitPrice(product, variant, item.getConfigurationToken(), item.getCustomerId(), configMap, accessoryMap), availableQuantity(item, variant, inventoryMap), configurationAddonPaise(item.getConfigurationToken(), item.getCustomerId(), configMap));
+                item.getConfigurationToken(), item.getQuantity(), effectiveUnitPrice(product, variant, item.getConfigurationToken(), item.getCustomerId(), configMap), availableQuantity(item, variant, inventoryMap), configurationAddonPaise(item.getConfigurationToken(), item.getCustomerId(), configMap));
     }
 
-    private java.math.BigDecimal effectiveUnitPrice(Product product, ProductVariant variant, String token, Long customerId, Map<String, com.wolfe.experience.ProductConfiguration> configMap, Map<Long, com.wolfe.visual.AccessoryOption> accessoryMap) {
+    private java.math.BigDecimal effectiveUnitPrice(Product product, ProductVariant variant, String token, Long customerId, Map<String, com.wolfe.experience.ProductConfiguration> configMap) {
         java.math.BigDecimal base = variant != null && variant.getPrice() != null ? variant.getPrice() : product == null ? java.math.BigDecimal.ZERO : product.getPrice();
         if (token == null || token.isBlank() || configurations == null || product == null) return base;
         var cfg = configMap == null ? null : configMap.get(token.trim());
