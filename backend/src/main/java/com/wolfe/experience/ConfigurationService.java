@@ -113,15 +113,7 @@ public class ConfigurationService {
                 .filter(Product::isActive)
                 .orElseThrow(() -> new java.util.NoSuchElementException("Product not found"));
 
-        long addon = 0;
-        if (configuration.getSelectedAccessoryId() != null) {
-            AccessoryOption accessory = accessories.findById(configuration.getSelectedAccessoryId())
-                    .filter(AccessoryOption::isActive)
-                    .filter(a -> a.getProduct().getId().equals(product.getId()))
-                    .orElseThrow(() -> new java.util.NoSuchElementException(
-                            "Configuration accessory not found"));
-            addon = toPaise(accessory.getPrice());
-        }
+        long addon = currentAddonPrice(configuration, product.getId());
         return new CurrentPricing(toPaise(product.getPrice()), addon);
     }
 
