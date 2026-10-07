@@ -65,7 +65,7 @@ public class CartController {
         var bundleItemMap = bundleItems.findByBundleIdIn(bundleIds).stream().collect(java.util.stream.Collectors.groupingBy(com.wolfe.bundle.BundleItem::getBundleId));
         var inventoryMap = inventory == null ? Map.<Long, com.wolfe.inventory.Inventory>of() : inventory.findAllById(productIds).stream().collect(java.util.stream.Collectors.toMap(com.wolfe.inventory.Inventory::getProductId, java.util.function.Function.identity()));
         var configTokens = rows.stream().map(CartItem::getConfigurationToken).filter(java.util.Objects::nonNull).map(String::trim).filter(v -> !v.isBlank()).collect(java.util.stream.Collectors.toSet());
-        var configMap = Map.<String, com.wolfe.experience.ProductConfiguration>of();
+        var configMap = new HashMap<String, com.wolfe.experience.ProductConfiguration>();
         for (String token : configTokens) {
             try {
                 var cfg = configurations.resolve(token);
