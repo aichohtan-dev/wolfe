@@ -81,7 +81,11 @@ public class ConfigurationService {
         return configuration;
     }
 
-    private int configurationTtlDays() {\n        return Integer.parseInt(System.getenv().getOrDefault("WOLFE_CONFIGURATION_TTL_DAYS", "30"));\n    }\n\n    public CurrentPricing currentPricing(ProductConfiguration configuration) {
+    private int configurationTtlDays() {
+        return Integer.parseInt(System.getenv().getOrDefault("WOLFE_CONFIGURATION_TTL_DAYS", "30"));
+    }
+
+    public CurrentPricing currentPricing(ProductConfiguration configuration) {
         Product product = products.findById(configuration.getProductId())
                 .filter(Product::isActive)
                 .orElseThrow(() -> new java.util.NoSuchElementException("Product not found"));
