@@ -80,13 +80,10 @@ public class ExperienceController {
     }
 
     @GetMapping("/configurations/{token}") public SharedConfigurationResponse share(@PathVariable String token) {
-        ProductConfiguration c = configurations.resolve(token, configurationTtlDays());
+        ProductConfiguration c = configurations.resolve(token);
         return new SharedConfigurationResponse(c, configurations.currentPricing(c));
     }
 
-    private int configurationTtlDays() {
-        return Integer.parseInt(System.getenv().getOrDefault("WOLFE_CONFIGURATION_TTL_DAYS", "30"));
-    }
 
     @PostMapping("/customers/{customerId}/recent/{productId}") public RecentlyViewed viewed(@PathVariable Long customerId, @PathVariable Long productId,
     Authentication a) {
