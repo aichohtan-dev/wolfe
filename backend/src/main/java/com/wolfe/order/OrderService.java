@@ -22,8 +22,6 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class OrderService {
-    @org.springframework.beans.factory.annotation.Value("${WOLFE_CONFIGURATION_TTL_DAYS:30}")
-    private int configurationTtlDays;
     private static final Set<String> TERMINAL = Set.of("DELIVERED", "CANCELLED");
     private final OrderRepository orders;
     private final OrderItemRepository items;
@@ -34,7 +32,7 @@ public class OrderService {
     private final CouponRepository coupons;
     private final OrderStatusHistoryRepository history;
     private final com.wolfe.notification.NotificationService notifications;
-    private final com.wolfe.experience.ConfigurationRepository configurations;
+    private final com.wolfe.experience.ConfigurationService configurations;
     private final BundleRepository bundles;
     private final BundleItemRepository bundleItems;
     private final com.wolfe.retailer.RetailerAllocationService retailerAllocationService;
@@ -51,7 +49,7 @@ public class OrderService {
                         ProductVariantRepository variants, InventoryRepository inventory,
                         CouponService couponService, CouponRepository coupons,
                         OrderStatusHistoryRepository history, com.wolfe.notification.NotificationService notifications,
-                        com.wolfe.experience.ConfigurationRepository configurations, BundleRepository bundles,
+                        com.wolfe.experience.ConfigurationService configurations, BundleRepository bundles,
                         BundleItemRepository bundleItems, com.wolfe.visual.AccessoryOptionRepository accessoryRepository) {
         this(orders, items, products, variants, inventory, couponService, coupons, history, notifications, configurations, bundles, bundleItems, accessoryRepository, null, null);
     }
@@ -60,7 +58,7 @@ public class OrderService {
                         ProductVariantRepository variants, InventoryRepository inventory,
                         CouponService couponService, CouponRepository coupons,
                         OrderStatusHistoryRepository history, com.wolfe.notification.NotificationService notifications,
-                        com.wolfe.experience.ConfigurationRepository configurations, BundleRepository bundles,
+                        com.wolfe.experience.ConfigurationService configurations, BundleRepository bundles,
                         BundleItemRepository bundleItems) {
         this(orders, items, products, variants, inventory, couponService, coupons, history, notifications, configurations, bundles, bundleItems, null, null, null);
     }
@@ -70,7 +68,7 @@ public class OrderService {
                         ProductVariantRepository variants, InventoryRepository inventory,
                         CouponService couponService, CouponRepository coupons,
                         OrderStatusHistoryRepository history, com.wolfe.notification.NotificationService notifications,
-                        com.wolfe.experience.ConfigurationRepository configurations, BundleRepository bundles,
+                        com.wolfe.experience.ConfigurationService configurations, BundleRepository bundles,
                         BundleItemRepository bundleItems, com.wolfe.visual.AccessoryOptionRepository accessoryRepository,
                         com.wolfe.retailer.RetailerAllocationService retailerAllocationService,
                         CustomerRepository customers) {
@@ -185,14 +183,7 @@ public class OrderService {
 
             com.wolfe.experience.ProductConfiguration cfg = null;
             if (input.configurationToken() != null && !input.configurationToken().isBlank()) {
-                cfg = configurations.findByShareToken(input.configurationToken())
-                        .orElseThrow(() -> new IllegalArgumentException("configuration not found"));
-                if (!Objects.equals(cfg.getProductId(), p.getId()))
-                    throw new IllegalArgumentException("configuration does not belong to product");
-                if (cfg.getCustomerId() != null && !Objects.equals(cfg.getCustomerId(), r.customerId()))
-                    throw new org.springframework.security.access.AccessDeniedException("configuration belongs to another customer");
-                if (cfg.getCreatedAt().plus(java.time.Duration.ofDays(configurationTtlDays)).isBefore(java.time.Instant.now()))
-                    throw new IllegalArgumentException("configuration has expired");
+                cfg = configurations.resolveForOrder(input.configurationToken(), r.customerId(), p.getId());
             }
 
             long unit;
@@ -204,8 +195,7 @@ public class OrderService {
                         : p.getPrice().movePointRight(2).longValueExact();
                 long currentAddon = 0;
                 if (cfg.getSelectedAccessoryId() != null) {
-                    var accessory = bundleAccessory(cfg.getSelectedAccessoryId(), p.getId());
-                    currentAddon = accessory.getPrice() == null ? 0 : accessory.getPrice().movePointRight(2).longValueExact();
+                    currentAddon = configurations.currentAddonPrice(cfg, p.getId());
                 }
                 unit = Math.addExact(currentBase, currentAddon);
             } else if (variant != null && variant.getPrice() != null) {
