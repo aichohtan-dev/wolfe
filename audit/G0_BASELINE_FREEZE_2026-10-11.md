@@ -236,3 +236,11 @@ This file records a **G0 baseline freeze and initial G1 source rechecks**, not f
 1. Verify CI and Docker Verification for commit `e5317a9fbdb603a68ba4c79349cd432bf4f3ded1`.
 2. If tests fail, use job logs to repair test setup/assertions without weakening the expected no-save/no-audit invariant.
 3. Inspect cash reconciliation and recovery collection state rules; add tests for invalid transitions/replay only where service code lacks coverage.
+
+
+## G1 source checks — batch 13 (settlement test mapping correction)
+
+- Inspected backend CI logs for commit `a1aba603d132f8c14286e026c1465cf7ad0efe8f`: backend failed because `adminWithoutRetailerPermissionCannotSettleRetailerPayment` expected 403 but received 404. This was a **test URL mapping error**, not evidence of an authorization bypass: `AdminRetailerController` maps settlements at `/api/v1/admin/retailers/settlements/{id}/settle`, not `/api/v1/admin/retailers/{retailerId}/settlements/{id}/settle`.
+- Corrected all three settlement authorization test URLs to the actual mapped route in commit `53cb7e8fc22457dd3716890aed9563b21c91536d`. Kept 401/403 assertions unchanged; did not weaken tests or change production source.
+- Added service-level tests in `RetailerSettlementServiceTest` for refusing PENDING -> SETTLED and rejecting replay after a successful settlement without a second save/audit event. These are in earlier commit `e5317a9fbdb603a68ba4c79349cd432bf4f3ded1`.
+- **Verification state:** correction pushed to audit branch. CI must pass on latest commit before closing this test batch; older workflow outcomes do not verify the correction.
