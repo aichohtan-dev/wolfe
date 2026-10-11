@@ -160,7 +160,7 @@ class AdminRetailerControllerHttpSecurityTest {
 
     @Test
     void anonymousCannotSettleRetailerPaymentThroughMappedMutationEndpoint() throws Exception {
-        mvc.perform(post("/api/v1/admin/retailers/123/settlements/456/settle")
+        mvc.perform(post("/api/v1/admin/retailers/settlements/456/settle")
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -173,7 +173,7 @@ class AdminRetailerControllerHttpSecurityTest {
 
     @Test
     void customerCannotSettleRetailerPaymentThroughMappedMutationEndpoint() throws Exception {
-        mvc.perform(post("/api/v1/admin/retailers/123/settlements/456/settle")
+        mvc.perform(post("/api/v1/admin/retailers/settlements/456/settle")
                         .with(user("customer").roles("CUSTOMER"))
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -187,7 +187,7 @@ class AdminRetailerControllerHttpSecurityTest {
 
     @Test
     void adminWithoutRetailerPermissionCannotSettleRetailerPayment() throws Exception {
-        mvc.perform(post("/api/v1/admin/retailers/123/settlements/456/settle")
+        mvc.perform(post("/api/v1/admin/retailers/settlements/456/settle")
                         .with(user("admin").authorities(
                                 new SimpleGrantedAuthority("ROLE_ADMIN")))
                         .with(csrf())
