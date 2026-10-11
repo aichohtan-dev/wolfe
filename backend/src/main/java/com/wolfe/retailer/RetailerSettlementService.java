@@ -141,6 +141,12 @@ public class RetailerSettlementService {
     @Transactional
     public RetailerSettlement setCashExpected(Long settlementId, long expected) {
         RetailerSettlement s = settlementRepo.findByIdForUpdate(settlementId).orElseThrow(() -> new IllegalArgumentException("Settlement not found"));
+        if (!"PENDING".equalsIgnoreCase(s.getStatus())) {
+            throw new IllegalStateException("COD cash expected amount can only be set while settlement is PENDING");
+        }
+        if ("RECONCILED".equalsIgnoreCase(s.getCashReconciliationStatus())) {
+            throw new IllegalStateException("Reconciled COD cash cannot be reset without an audited correction workflow");
+        }
         s.setCashExpected(expected);
         return settlementRepo.save(s);
     }
