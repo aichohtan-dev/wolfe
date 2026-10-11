@@ -725,7 +725,7 @@ public class AdminController {
             saved = returnProcessingService.complete(saved.getId(), r.refundAmount(), "ADMIN");
         }
         notificationService.returnUpdate(saved.getCustomerId(), saved.getOrderId(), saved.getStatus());
-        return saved;
+        return new ReturnAdminView(saved);
     }
     private static boolean allowedTransition(String from, String to, Map<String, Set<String>> transitions) {
         return from.equals(to) || transitions.getOrDefault(from, Set.of()).contains(to);
