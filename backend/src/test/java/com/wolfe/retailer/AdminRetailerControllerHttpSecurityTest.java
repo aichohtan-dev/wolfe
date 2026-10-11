@@ -108,4 +108,53 @@ class AdminRetailerControllerHttpSecurityTest {
                                 new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_ADMIN"))))
                 .andExpect(status().isForbidden());
     }
+
+    @Test
+    void anonymousCannotAdjustRetailerStockThroughMappedMutationEndpoint() throws Exception {
+        mvc.perform(post("/api/v1/admin/retailers/123/inventory/adjust")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "sku": "SECURITY-TEST-SKU",
+                                  "newPhysicalStock": 10,
+                                  "reason": "authorization regression test"
+                                }
+                                """))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void customerCannotAdjustRetailerStockThroughMappedMutationEndpoint() throws Exception {
+        mvc.perform(post("/api/v1/admin/retailers/123/inventory/adjust")
+                        .with(user("customer").roles("CUSTOMER"))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "sku": "SECURITY-TEST-SKU",
+                                  "newPhysicalStock": 10,
+                                  "reason": "authorization regression test"
+                                }
+                                """))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void adminWithoutRetailerPermissionCannotAdjustRetailerStock() throws Exception {
+        mvc.perform(post("/api/v1/admin/retailers/123/inventory/adjust")
+                        .with(user("admin").authorities(
+                                new org.springframework.security.core.authority.SimpleGrantedAuthority("ROLE_ADMIN")))
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "sku": "SECURITY-TEST-SKU",
+                                  "newPhysicalStock": 10,
+                                  "reason": "authorization regression test"
+                                }
+                                """))
+                .andExpect(status().isForbidden());
+    }
+
 }
