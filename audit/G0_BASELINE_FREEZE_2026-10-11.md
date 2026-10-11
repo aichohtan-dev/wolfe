@@ -103,3 +103,18 @@ The carry-forward rows are not necessarily unique root causes. Deduplicate histo
 ## Certification statement
 
 This file records a **G0 baseline freeze and initial G1 source rechecks**, not full G1 completion and not release certification. Both workflows passed for frozen main, and both workflows also passed for the prior audit-report commit listed above. A new regression-test commit has now been added and is awaiting its own CI evidence. Historical closures are preserved; outstanding items are scoped test/evidence gates or confirmed capability/documentation gaps, not an instruction to reopen every old finding.
+
+
+## G1 source checks — batch 4 (customer-address object authorization)
+
+- **Mapped object ownership invariant:** `CustomerAddressController.update` and `delete` both load the requested address and filter by `customerId` before mutating it. The controller's list/create/update/delete methods also call `CustomerAccess.requireCustomer` for the path customer. Source inspection found no confirmed IDOR in these methods.
+- **Regression test added:** `backend/src/test/java/com/wolfe/address/CustomerAddressControllerSecurityTest.java` tests cross-customer address ID lookup for update/delete and a mismatched customer ID for list. The tests assert that no repository mutation happens after a foreign address is supplied.
+- **Verification state:** test committed on the audit branch; CI for the commit containing this new test is pending. Do not mark PASS until backend CI succeeds.
+- **Order duplicate-line regression:** commit `dafd671c9098ec5c6bd2f14656a37bfdc2de4bff` passed both Wolfe CI and Docker Verification. The duplicate-identical-lines regression test is therefore **FIXED + CI-VERIFIED for this unit-test scenario**; deterministic database concurrency remains a separate evidence gate.
+
+## Next steps (G1 continuation)
+
+1. Verify CI for the customer-address ownership regression test and correct any test setup failures without weakening assertions.
+2. Continue mapped endpoint ownership/permission review for cart, order, retailer, admin, and PDF-import handlers; add negative tests only where there is a meaningful uncovered boundary.
+3. Preserve the passing JWT, refresh-token, and URL role-matrix tests as closed; don't reopen without a reproduced regression.
+4. Keep production Flyway history, browser E2E, production-like deployment/observability, and independent G13 acceptance as explicit evidence gates.
