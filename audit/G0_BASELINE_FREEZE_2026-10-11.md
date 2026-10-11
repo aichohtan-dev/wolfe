@@ -204,3 +204,18 @@ This file records a **G0 baseline freeze and initial G1 source rechecks**, not f
 1. Check latest CI results and inspect backend test logs for the new stock-adjustment cases.
 2. If a test fails, correct test configuration or assertions based on logs; do not weaken security assertions merely to obtain green CI.
 3. Once this batch passes, move to the mapped retailer settlement mutation route and test its authorization boundary.
+
+
+## G1 source checks — batch 11 (retailer settlement authorization)
+
+- Added three negative HTTP integration tests for the mapped `POST /api/v1/admin/retailers/{id}/settlements/{id}/settle` route: anonymous -> 401, CUSTOMER -> 403, and ROLE_ADMIN without `PERM_ADMIN_RETAILER` -> 403.
+- Request includes CSRF token and a harmless test reference. Authorization is expected to reject the request before settlement service execution.
+- Production source is unchanged: the controller's class-level `@PreAuthorize("hasAuthority('PERM_ADMIN_RETAILER')")` protects this settlement route along with the other admin-retailer mappings.
+- Test commit: `f6dd812de4aeaa9d11684b9a219cf9191c45642a`; CI and Docker Verification for this test set must complete before marking it PASS.
+- The stock-adjustment negative tests on commit `7eeb63af9499cfa84575a6a90b320d9deff5b79f` have Wolfe CI PASS; Docker Verification for that older commit was still running at the last status check. Do not transfer an earlier green status to the newest commit.
+
+## Next steps
+
+1. Recheck CI and Docker Verification for the latest settlement test commit.
+2. If a test fails, inspect logs and correct test configuration/assertions without weakening the authorization expectation.
+3. After successful verification, review the settlement service's business-state transitions and add targeted tests for invalid transition/replay conditions where current coverage is missing.
