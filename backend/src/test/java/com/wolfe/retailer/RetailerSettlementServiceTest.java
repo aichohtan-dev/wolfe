@@ -164,12 +164,13 @@ public class RetailerSettlementServiceTest {
 
         RetailerSettlement recovered = service.collectRecovery(54L, "RECOVERY-REF-54", "admin");
 
-        assertEquals("ELIGIBLE", recovered.getStatus());
+        assertEquals("SETTLED", recovered.getStatus());
         assertEquals(0L, recovered.getRecoveryDueAmount());
-        RetailerSettlement settledAgain = service.markSettled(54L, "BANK-REF-54-SECOND", "admin");
-        assertEquals("SETTLED", settledAgain.getStatus());
-        verify(settlementRepo, times(2)).save(recoveryDue);
-        verify(auditRepo, times(2)).save(any(RetailerAuditLog.class));
+        assertThrows(IllegalStateException.class,
+                () -> service.markSettled(54L, "BANK-REF-54-SECOND", "admin"));
+        assertEquals("BANK-REF-54", recovered.getReferenceNumber());
+        verify(settlementRepo, times(1)).save(recoveryDue);
+        verify(auditRepo, times(1)).save(any(RetailerAuditLog.class));
     }
 
 }
