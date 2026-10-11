@@ -310,3 +310,20 @@ This file records a **G0 baseline freeze and initial G1 source rechecks**, not f
 1. Verify latest CI and Docker Verification for commit `3f3310c5423c20d008213d844319d4dd8b7437eb`.
 2. If green, review settlement initialization inputs for amount arithmetic/consistency and duplicate order+retailer settlement creation under concurrency.
 3. Keep all previously verified fixes closed and distinguish source-fixed from CI-verified.
+
+
+## G1 source checks — batch 18 (settlement initialization amount consistency)
+
+- **Verification:** commit `5b701b4590873f9b0c0c6fc973581c5f398ff4a7` passed Wolfe CI and Docker Verification for cash reconciliation replay protection. CI for the cash-expected lifecycle guard passed on commit `3f3310c5423c20d008213d844319d4dd8b7437eb`; Docker for that commit and latest report commit remained in progress at the last check.
+- **Confirmed source defect:** `initializeSettlement(orderId, retailerId, grossAmount, wolfeMarginAmount, retailerPayableAmount)` previously persisted caller-supplied monetary fields without validating identity, positivity, or `gross = margin + retailer payable`. An inconsistent internal call could create a settlement with amounts that do not reconcile.
+- **Production fix:** validate nonblank order ID, positive retailer ID, positive gross, nonnegative margin/payable, each component not exceeding gross, and exact invariant `wolfeMarginAmount == grossAmount - retailerPayableAmount` before repository lookup/save.
+- **Regression tests added:** inconsistent amounts, negative/zero values, blank order ID and invalid retailer ID must reject without persistence/audit; valid amounts persist once and produce one audit event.
+- Commits: production fix `66ce267b80354741f2f57de2fe11299443f503b8`; tests `16a91edaf0f7112a3ad3bd1eecf7b230cac6c0f9`. Latest CI and Docker Verification must pass before calling the batch verified.
+- This guard validates arithmetic consistency but does not independently prove amounts were derived from trusted order lines; caller/data-flow verification remains a separate follow-up.
+- No OTP/authentication code changed; main remains unchanged.
+
+## Next steps
+
+1. Verify latest CI and Docker Verification for commit `16a91edaf0f7112a3ad3bd1eecf7b230cac6c0f9`.
+2. If green, trace every production call site of `initializeSettlement` and verify amounts derive from authoritative order/item data, not client-controlled values.
+3. Review concurrent duplicate settlement creation; check database uniqueness and transaction behavior before changing locking or schema.
