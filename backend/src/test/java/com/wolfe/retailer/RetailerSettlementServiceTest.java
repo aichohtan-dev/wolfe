@@ -196,4 +196,29 @@ public class RetailerSettlementServiceTest {
         verify(auditRepo, times(1)).save(any(RetailerAuditLog.class));
     }
 
+
+    @Test
+    void cashExpectedCannotBeChangedAfterSettlementBecomesEligible() {
+        RetailerSettlement eligible = new RetailerSettlement("WLF-CASH-LOCK", 7L, 10000L, 1000L, 9000L);
+        eligible.markEligible();
+        when(settlementRepo.findByIdForUpdate(56L)).thenReturn(Optional.of(eligible));
+
+        assertThrows(IllegalStateException.class, () -> service.setCashExpected(56L, 8000L));
+        verify(settlementRepo, never()).save(any());
+    }
+
+    @Test
+    void cashExpectedCannotBeChangedAfterReconciliation() {
+        RetailerSettlement eligible = new RetailerSettlement("WLF-CASH-LOCK-RECON", 7L, 10000L, 1000L, 9000L);
+        eligible.setCashExpected(9000L);
+        eligible.markEligible();
+        eligible.reconcileCash(9000L, 9000L, 9000L, "CASH-LOCK-REF");
+        when(settlementRepo.findByIdForUpdate(57L)).thenReturn(Optional.of(eligible));
+
+        assertThrows(IllegalStateException.class, () -> service.setCashExpected(57L, 8500L));
+        assertEquals(9000L, eligible.getCashExpectedAmount());
+        assertEquals("CASH-LOCK-REF", eligible.getCashReconciliationReference());
+        verify(settlementRepo, never()).save(any());
+    }
+
 }
