@@ -219,3 +219,20 @@ This file records a **G0 baseline freeze and initial G1 source rechecks**, not f
 1. Recheck CI and Docker Verification for the latest settlement test commit.
 2. If a test fails, inspect logs and correct test configuration/assertions without weakening the authorization expectation.
 3. After successful verification, review the settlement service's business-state transitions and add targeted tests for invalid transition/replay conditions where current coverage is missing.
+
+
+## G1 source checks — batch 12 (settlement state transition and replay)
+
+- Added unit tests in `RetailerSettlementServiceTest`:
+  - `serviceRejectsSettlementFromPendingStateWithoutSavingOrAuditing`: a PENDING settlement cannot be paid; repository save and audit log must not occur.
+  - `serviceRejectsDuplicateSettlementReplayAfterFirstSuccessfulSettlement`: after a successful ELIGIBLE -> SETTLED transition, a replay cannot replace the bank reference or create a second audit event.
+- The production service locks the settlement row with `findByIdForUpdate` and checks status is exactly ELIGIBLE before settlement; this source guard existed already, so production code was not changed.
+- Test commit: `e5317a9fbdb603a68ba4c79349cd432bf4f3ded1`. CI and Docker Verification must pass for this commit before the added tests are marked verified.
+- CI + Docker Verification passed on prior commit `ea6e519a114d8f7a15dc602af35146d3c1b38ee1`; the settlement-authorization commit and latest tests each have their own CI status. Do not inherit status across commits.
+- Scope note: replay protection here covers service state transition, not an external bank/provider idempotency key; there is no live payment gateway in the current COD-only flow.
+
+## Next steps
+
+1. Verify CI and Docker Verification for commit `e5317a9fbdb603a68ba4c79349cd432bf4f3ded1`.
+2. If tests fail, use job logs to repair test setup/assertions without weakening the expected no-save/no-audit invariant.
+3. Inspect cash reconciliation and recovery collection state rules; add tests for invalid transitions/replay only where service code lacks coverage.
