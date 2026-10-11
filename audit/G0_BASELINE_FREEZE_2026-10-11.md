@@ -164,3 +164,20 @@ This file records a **G0 baseline freeze and initial G1 source rechecks**, not f
 2. Continue with one or two actual mapped admin endpoints that mutate state, testing anonymous/customer rejection and permission-gated behavior.
 3. Inspect retailer-scoped entity serialization and DTO fields with exact source evidence; do not mark direct entity serialization as a leak without a sensitive field exposure.
 4. Keep production Flyway history, browser E2E, production-like deployment/observability, and independent G13 acceptance as evidence gates.
+
+
+## G1 source checks — batch 8 (admin-retailer mutation authorization)
+
+- Expanded `AdminRetailerControllerHttpSecurityTest` to exercise the mapped `POST /api/v1/admin/retailers` mutation endpoint as well as the mapped GET endpoint.
+- New negative cases assert: anonymous POST -> 401; CUSTOMER POST -> 403; ROLE_ADMIN without `PERM_ADMIN_RETAILER` POST -> 403. CSRF tokens are explicitly supplied so the assertions target authorization rather than failing early due to CSRF.
+- Request body uses an `.invalid` email and the expected security result is denial before controller processing. These are HTTP authorization tests; they do not create retailer data.
+- Commit: `c74f34d71c1bee2b08e34cb16233c8472c961d6c`. CI and Docker Verification are triggered/pending; do not mark the new mutation cases PASS until workflow evidence is complete.
+- Previous commit `ce7987261b6464be5600c5571d62733ad8925f0d` passed Wolfe CI for the GET endpoint test; its Docker verification was still in progress at last check. Preserve that distinct commit-specific evidence.
+- No production code was changed: role and explicit permission checks are already present. No OTP/authentication-flow change was made.
+
+## Next steps (G1 continuation)
+
+1. Verify Wolfe CI for the new GET+POST authorization cases; fix only evidenced test/setup issues, preserving expected 401/403 behavior.
+2. Verify Docker Verification for the current branch head.
+3. Continue with another real mutation route only after current CI passes, then review retailer data serialization for sensitive fields with concrete field-level evidence.
+4. Keep production Flyway history, browser E2E, production-like deployment/observability, and independent G13 acceptance as evidence gates.
