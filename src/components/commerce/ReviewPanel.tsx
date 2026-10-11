@@ -81,7 +81,7 @@ export function ReviewPanel({ slug, user }: ReviewPanelProps) {
         {mine && <button type="button" className="btn btn-light" onClick={async () => {
           try { await api.reviews.remove(mine.id); setMine(null); setSent(v => !v); setError(''); }
           catch (err: any) { setError(err.message || 'Unable to delete review'); }
-        }}>Delete my review</button>
+        }}>Delete my review</button>}
         {sent && <p className="checkout-login-note">Review submitted for approval.</p>}
         {data.totalPages > 1 && <div className="admin-actions" style={{ marginTop: 16 }}>
         <button className="btn btn-light" disabled={page <= 0} onClick={() => setPage(p => Math.max(0, p - 1))}>Previous</button>
