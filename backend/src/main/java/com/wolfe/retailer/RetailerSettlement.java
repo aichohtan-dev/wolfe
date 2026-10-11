@@ -167,11 +167,11 @@ public class RetailerSettlement {
         if (recoveryDueAmount <= 0) throw new IllegalStateException("No recovery amount is due");
         if (reference == null || reference.isBlank()) throw new IllegalArgumentException("recovery reference is required");
         recoveryDueAmount = 0;
-        // Recovery is a cash collection of a post-payout return adjustment. Once the
-        // recovery is collected there is no remaining recovery blocker, so the settlement
-        // must return to ELIGIBLE for the normal payout flow rather than getting stranded
-        // in ADJUSTED (markSettled only accepts ELIGIBLE).
-        status = "ELIGIBLE";
+        // A post-payout return recovery must not reopen an already paid settlement:
+        // doing so would allow markSettled() to pay the original retailer payable again.
+        // For a pre-payout recovery, return to ELIGIBLE so the adjusted net payable can
+        // proceed through the normal settlement flow.
+        status = settledAt != null ? "SETTLED" : "ELIGIBLE";
         notes = (notes == null ? "" : notes + "; ") + "Recovery collected: " + reference.trim();
         touch();
     }

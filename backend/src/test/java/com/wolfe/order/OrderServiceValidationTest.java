@@ -1,5 +1,7 @@
 package com.wolfe.order;
 
+import com.wolfe.customer.Customer;
+import com.wolfe.customer.CustomerRepository;
 import com.wolfe.bundle.BundleItemRepository;
 import com.wolfe.bundle.BundleRepository;
 import com.wolfe.catalog.ProductRepository;
@@ -30,6 +32,44 @@ class OrderServiceValidationTest {
             Mockito.mock(BundleRepository.class),
             Mockito.mock(BundleItemRepository.class)
         );
+    }
+
+    @Test
+    void rejectsCheckoutWhenCustomerEmailIsUnverifiedBeforeOrderOrStockMutation() {
+        var orders = Mockito.mock(OrderRepository.class);
+        var items = Mockito.mock(OrderItemRepository.class);
+        var products = Mockito.mock(ProductRepository.class);
+        var variants = Mockito.mock(ProductVariantRepository.class);
+        var inventory = Mockito.mock(InventoryRepository.class);
+        var couponService = Mockito.mock(CouponService.class);
+        var coupons = Mockito.mock(CouponRepository.class);
+        var history = Mockito.mock(OrderStatusHistoryRepository.class);
+        var notifications = Mockito.mock(NotificationService.class);
+        var configurations = Mockito.mock(ConfigurationService.class);
+        var bundles = Mockito.mock(BundleRepository.class);
+        var bundleItems = Mockito.mock(BundleItemRepository.class);
+        var accessories = Mockito.mock(com.wolfe.visual.AccessoryOptionRepository.class);
+        var retailerAllocation = Mockito.mock(com.wolfe.retailer.RetailerAllocationService.class);
+        var customers = Mockito.mock(CustomerRepository.class);
+
+        Customer customer = new Customer("Test", "test@example.com", "encoded");
+        customer.markEmailUnverified();
+        Mockito.when(customers.findByIdForUpdate(1L)).thenReturn(java.util.Optional.of(customer));
+
+        var service = new OrderService(orders, items, products, variants, inventory, couponService, coupons,
+                history, notifications, configurations, bundles, bundleItems, accessories, retailerAllocation, customers);
+        var request = new OrderService.CreateOrder(
+                1L, "Test", "test@example.com", "9999999999", "A", "Jodhpur", "342001",
+                null, null, "COD", "STANDARD", null,
+                java.util.List.of(new OrderService.Item("w-01", 1, null, null, null, null)),
+                "unverified-email-test-key");
+
+        var ex = assertThrows(IllegalStateException.class, () -> service.create(request));
+
+        assertEquals("email verification is required before placing a COD order", ex.getMessage());
+        Mockito.verify(customers).findByIdForUpdate(1L);
+        Mockito.verifyNoInteractions(orders, items, products, variants, inventory, couponService, coupons,
+                history, notifications, configurations, bundles, bundleItems, accessories, retailerAllocation);
     }
 
     @Test

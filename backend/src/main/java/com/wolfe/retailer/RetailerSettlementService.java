@@ -72,6 +72,17 @@ public class RetailerSettlementService {
 
     @Transactional
     public RetailerSettlement initializeSettlement(String orderId, Long retailerId, long grossAmount, long wolfeMarginAmount, long retailerPayableAmount) {
+        if (orderId == null || orderId.isBlank()) {
+            throw new IllegalArgumentException("settlement order ID is required");
+        }
+        if (retailerId == null || retailerId <= 0) {
+            throw new IllegalArgumentException("settlement retailer ID must be positive");
+        }
+        if (grossAmount <= 0 || wolfeMarginAmount < 0 || retailerPayableAmount < 0
+                || wolfeMarginAmount > grossAmount || retailerPayableAmount > grossAmount
+                || wolfeMarginAmount != grossAmount - retailerPayableAmount) {
+            throw new IllegalArgumentException("settlement amounts must be non-negative and margin plus retailer payable must equal gross amount");
+        }
         Optional<RetailerSettlement> existing = settlementRepo.findTopByOrderIdAndRetailerIdOrderByIdDesc(orderId, retailerId);
         if (existing.isPresent() && !"ADJUSTED".equalsIgnoreCase(existing.get().getStatus())) {
             return existing.get();
@@ -128,6 +139,9 @@ public class RetailerSettlementService {
     public RetailerSettlement reconcileCash(Long settlementId, long expected, long collected, long deposited, String reference, String actor) {
         RetailerSettlement s = settlementRepo.findByIdForUpdate(settlementId).orElseThrow(() -> new IllegalArgumentException("Settlement not found"));
         if (!"ELIGIBLE".equalsIgnoreCase(s.getStatus())) throw new IllegalStateException("COD cash can only be reconciled for an ELIGIBLE settlement");
+        if ("RECONCILED".equalsIgnoreCase(s.getCashReconciliationStatus())) {
+            throw new IllegalStateException("COD cash is already reconciled; use an audited correction workflow");
+        }
         if (expected != s.getCashExpectedAmount()) throw new IllegalArgumentException("cash expected amount must match the server-calculated order amount");
         s.reconcileCash(expected, collected, deposited, reference);
         RetailerSettlement saved = settlementRepo.save(s);
@@ -138,6 +152,12 @@ public class RetailerSettlementService {
     @Transactional
     public RetailerSettlement setCashExpected(Long settlementId, long expected) {
         RetailerSettlement s = settlementRepo.findByIdForUpdate(settlementId).orElseThrow(() -> new IllegalArgumentException("Settlement not found"));
+        if (!"PENDING".equalsIgnoreCase(s.getStatus())) {
+            throw new IllegalStateException("COD cash expected amount can only be set while settlement is PENDING");
+        }
+        if ("RECONCILED".equalsIgnoreCase(s.getCashReconciliationStatus())) {
+            throw new IllegalStateException("Reconciled COD cash cannot be reset without an audited correction workflow");
+        }
         s.setCashExpected(expected);
         return settlementRepo.save(s);
     }

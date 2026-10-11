@@ -79,4 +79,184 @@ public class RetailerSettlementServiceTest {
         assertEquals("SETTLED", s.getStatus());
         assertEquals("BANK-TXN-9988", s.getReferenceNumber());
     }
+
+    @Test
+    void serviceRejectsSettlementFromPendingStateWithoutSavingOrAuditing() {
+        RetailerSettlement pending = new RetailerSettlement("WLF-PENDING", 7L, 10000L, 1000L, 9000L);
+        when(settlementRepo.findByIdForUpdate(41L)).thenReturn(Optional.of(pending));
+
+        assertThrows(IllegalStateException.class,
+                () -> service.markSettled(41L, "BANK-REF-41", "admin"));
+
+        verify(settlementRepo, never()).save(any());
+        verifyNoInteractions(auditRepo);
+    }
+
+    @Test
+    void serviceRejectsDuplicateSettlementReplayAfterFirstSuccessfulSettlement() {
+        RetailerSettlement eligible = new RetailerSettlement("WLF-REPLAY", 7L, 10000L, 1000L, 9000L);
+        eligible.markEligible();
+        when(settlementRepo.findByIdForUpdate(42L)).thenReturn(Optional.of(eligible));
+        when(settlementRepo.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        RetailerSettlement settled = service.markSettled(42L, "BANK-REF-42", "admin");
+        assertEquals("SETTLED", settled.getStatus());
+
+        assertThrows(IllegalStateException.class,
+                () -> service.markSettled(42L, "BANK-REF-42-REPLAY", "admin"));
+
+        verify(settlementRepo, times(1)).save(eligible);
+        verify(auditRepo, times(1)).save(any(RetailerAuditLog.class));
+        assertEquals("BANK-REF-42", eligible.getReferenceNumber());
+    }
+
+
+    @Test
+    void cashReconciliationRejectsPendingSettlementWithoutSavingOrAuditing() {
+        RetailerSettlement pending = new RetailerSettlement("WLF-CASH-PENDING", 7L, 10000L, 1000L, 9000L);
+        pending.setCashExpected(9000L);
+        when(settlementRepo.findByIdForUpdate(51L)).thenReturn(Optional.of(pending));
+
+        assertThrows(IllegalStateException.class,
+                () -> service.reconcileCash(51L, 9000L, 9000L, 9000L, "CASH-REF-51", "admin"));
+
+        verify(settlementRepo, never()).save(any());
+        verifyNoInteractions(auditRepo);
+    }
+
+    @Test
+    void cashReconciliationRejectsCollectedOrDepositedMismatch() {
+        RetailerSettlement eligible = new RetailerSettlement("WLF-CASH-MISMATCH", 7L, 10000L, 1000L, 9000L);
+        eligible.setCashExpected(9000L);
+        eligible.markEligible();
+        when(settlementRepo.findByIdForUpdate(52L)).thenReturn(Optional.of(eligible));
+
+        assertThrows(IllegalArgumentException.class,
+                () -> service.reconcileCash(52L, 9000L, 8000L, 9000L, "CASH-REF-52", "admin"));
+
+        verify(settlementRepo, never()).save(any());
+        verifyNoInteractions(auditRepo);
+    }
+
+    @Test
+    void recoveryCollectionRejectsWhenNoRecoveryIsDue() {
+        RetailerSettlement eligible = new RetailerSettlement("WLF-NO-RECOVERY", 7L, 10000L, 1000L, 9000L);
+        eligible.markEligible();
+        when(settlementRepo.findByIdForUpdate(53L)).thenReturn(Optional.of(eligible));
+
+        assertThrows(IllegalStateException.class,
+                () -> service.collectRecovery(53L, "RECOVERY-REF-53", "admin"));
+
+        verify(settlementRepo, never()).save(any());
+        verifyNoInteractions(auditRepo);
+    }
+
+    @Test
+    void recoveryCollectionClearsRecoveryAndAllowsNormalEligiblePayout() {
+        RetailerSettlement recoveryDue = new RetailerSettlement("WLF-RECOVERY-DUE", 7L, 10000L, 1000L, 9000L);
+        recoveryDue.markEligible();
+        recoveryDue.markSettled("BANK-REF-54");
+        recoveryDue.markAdjustedForReturn(1000L, "partial return after payout");
+        assertEquals("RECOVERY_DUE", recoveryDue.getStatus());
+        assertEquals(1000L, recoveryDue.getRecoveryDueAmount());
+        when(settlementRepo.findByIdForUpdate(54L)).thenReturn(Optional.of(recoveryDue));
+        when(settlementRepo.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        RetailerSettlement recovered = service.collectRecovery(54L, "RECOVERY-REF-54", "admin");
+
+        assertEquals("SETTLED", recovered.getStatus());
+        assertEquals(0L, recovered.getRecoveryDueAmount());
+        assertThrows(IllegalStateException.class,
+                () -> service.markSettled(54L, "BANK-REF-54-SECOND", "admin"));
+        assertEquals("BANK-REF-54", recovered.getReferenceNumber());
+        verify(settlementRepo, times(1)).save(recoveryDue);
+        verify(auditRepo, times(1)).save(any(RetailerAuditLog.class));
+    }
+
+
+    @Test
+    void cashReconciliationReplayCannotReplaceRecordedReferenceOrAmounts() {
+        RetailerSettlement eligible = new RetailerSettlement("WLF-CASH-REPLAY", 7L, 10000L, 1000L, 9000L);
+        eligible.setCashExpected(9000L);
+        eligible.markEligible();
+        when(settlementRepo.findByIdForUpdate(55L)).thenReturn(Optional.of(eligible));
+        when(settlementRepo.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        RetailerSettlement reconciled = service.reconcileCash(
+                55L, 9000L, 9000L, 9000L, "CASH-REF-ORIGINAL", "admin");
+        assertEquals("RECONCILED", reconciled.getCashReconciliationStatus());
+
+        assertThrows(IllegalStateException.class,
+                () -> service.reconcileCash(55L, 9000L, 9000L, 9000L, "CASH-REF-REPLAY", "admin"));
+
+        assertEquals("CASH-REF-ORIGINAL", reconciled.getCashReconciliationReference());
+        assertEquals(9000L, reconciled.getCashCollectedAmount());
+        assertEquals(9000L, reconciled.getCashDepositedAmount());
+        verify(settlementRepo, times(1)).save(eligible);
+        verify(auditRepo, times(1)).save(any(RetailerAuditLog.class));
+    }
+
+
+    @Test
+    void cashExpectedCannotBeChangedAfterSettlementBecomesEligible() {
+        RetailerSettlement eligible = new RetailerSettlement("WLF-CASH-LOCK", 7L, 10000L, 1000L, 9000L);
+        eligible.markEligible();
+        when(settlementRepo.findByIdForUpdate(56L)).thenReturn(Optional.of(eligible));
+
+        assertThrows(IllegalStateException.class, () -> service.setCashExpected(56L, 8000L));
+        verify(settlementRepo, never()).save(any());
+    }
+
+    @Test
+    void cashExpectedCannotBeChangedAfterReconciliation() {
+        RetailerSettlement eligible = new RetailerSettlement("WLF-CASH-LOCK-RECON", 7L, 10000L, 1000L, 9000L);
+        eligible.setCashExpected(9000L);
+        eligible.markEligible();
+        eligible.reconcileCash(9000L, 9000L, 9000L, "CASH-LOCK-REF");
+        when(settlementRepo.findByIdForUpdate(57L)).thenReturn(Optional.of(eligible));
+
+        assertThrows(IllegalStateException.class, () -> service.setCashExpected(57L, 8500L));
+        assertEquals(9000L, eligible.getCashExpectedAmount());
+        assertEquals("CASH-LOCK-REF", eligible.getCashReconciliationReference());
+        verify(settlementRepo, never()).save(any());
+    }
+
+
+    @Test
+    void initializeSettlementRejectsInconsistentGrossMarginAndPayableAmounts() {
+        assertThrows(IllegalArgumentException.class,
+                () -> service.initializeSettlement("WLF-BAD-AMOUNTS", 7L, 10000L, 1000L, 8500L));
+        verify(settlementRepo, never()).save(any());
+        verifyNoInteractions(auditRepo);
+    }
+
+    @Test
+    void initializeSettlementRejectsNegativeAmountsAndInvalidIdentity() {
+        assertThrows(IllegalArgumentException.class,
+                () -> service.initializeSettlement("WLF-NEGATIVE", 7L, 10000L, -1L, 10001L));
+        assertThrows(IllegalArgumentException.class,
+                () -> service.initializeSettlement("WLF-ZERO-GROSS", 7L, 0L, 0L, 0L));
+        assertThrows(IllegalArgumentException.class,
+                () -> service.initializeSettlement(" ", 7L, 10000L, 1000L, 9000L));
+        assertThrows(IllegalArgumentException.class,
+                () -> service.initializeSettlement("WLF-INVALID-RETAILER", 0L, 10000L, 1000L, 9000L));
+        verify(settlementRepo, never()).save(any());
+        verifyNoInteractions(auditRepo);
+    }
+
+    @Test
+    void initializeSettlementAcceptsConsistentAmountsAndPersistsOnce() {
+        when(settlementRepo.findTopByOrderIdAndRetailerIdOrderByIdDesc("WLF-VALID-AMOUNTS", 7L))
+                .thenReturn(Optional.empty());
+        when(settlementRepo.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        RetailerSettlement created = service.initializeSettlement("WLF-VALID-AMOUNTS", 7L, 10000L, 1000L, 9000L);
+
+        assertEquals(10000L, created.getGrossAmount());
+        assertEquals(1000L, created.getWolfeMarginAmount());
+        assertEquals(9000L, created.getRetailerPayableAmount());
+        verify(settlementRepo, times(1)).save(any(RetailerSettlement.class));
+        verify(auditRepo, times(1)).save(any(RetailerAuditLog.class));
+    }
+
 }
