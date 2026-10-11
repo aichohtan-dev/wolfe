@@ -79,4 +79,35 @@ public class RetailerSettlementServiceTest {
         assertEquals("SETTLED", s.getStatus());
         assertEquals("BANK-TXN-9988", s.getReferenceNumber());
     }
+
+    @Test
+    void serviceRejectsSettlementFromPendingStateWithoutSavingOrAuditing() {
+        RetailerSettlement pending = new RetailerSettlement("WLF-PENDING", 7L, 10000L, 1000L, 9000L);
+        when(settlementRepo.findByIdForUpdate(41L)).thenReturn(Optional.of(pending));
+
+        assertThrows(IllegalStateException.class,
+                () -> service.markSettled(41L, "BANK-REF-41", "admin"));
+
+        verify(settlementRepo, never()).save(any());
+        verifyNoInteractions(auditRepo);
+    }
+
+    @Test
+    void serviceRejectsDuplicateSettlementReplayAfterFirstSuccessfulSettlement() {
+        RetailerSettlement eligible = new RetailerSettlement("WLF-REPLAY", 7L, 10000L, 1000L, 9000L);
+        eligible.markEligible();
+        when(settlementRepo.findByIdForUpdate(42L)).thenReturn(Optional.of(eligible));
+        when(settlementRepo.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        RetailerSettlement settled = service.markSettled(42L, "BANK-REF-42", "admin");
+        assertEquals("SETTLED", settled.getStatus());
+
+        assertThrows(IllegalStateException.class,
+                () -> service.markSettled(42L, "BANK-REF-42-REPLAY", "admin"));
+
+        verify(settlementRepo, times(1)).save(eligible);
+        verify(auditRepo, times(1)).save(any(RetailerAuditLog.class));
+        assertEquals("BANK-REF-42", eligible.getReferenceNumber());
+    }
+
 }
