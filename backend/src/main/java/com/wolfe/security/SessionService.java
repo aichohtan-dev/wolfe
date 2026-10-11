@@ -53,11 +53,17 @@ public class SessionService {
         // version is advanced, leaving that newly-created token usable after reuse detection.
         Customer c = customers.findByIdForUpdate(old.getCustomerId())
                 .orElseThrow(() -> new IllegalArgumentException("INVALID_REFRESH_TOKEN"));
-        if (!old.active()) {
+        Instant now = Instant.now();
+        // Expired tokens are invalid, but expiry alone is not evidence of token theft.
+        // Only a token that was explicitly revoked before its expiry indicates reuse.
+        if (!old.getExpiresAt().isAfter(now)) {
+            throw new IllegalArgumentException("INVALID_REFRESH_TOKEN");
+        }
+        if (old.getRevokedAt() != null) {
             // A previously rotated/revoked token being presented is refresh-token reuse.
             // Customer locking makes family revocation and session-version invalidation atomic
             // with respect to concurrent session issuance.
-            repo.revokeAllByCustomerId(old.getCustomerId(), Instant.now());
+            repo.revokeAllByCustomerId(old.getCustomerId(), now);
             c.incrementSessionVersion();
             customers.save(c);
             throw new InvalidRefreshTokenReuseException(old.getCustomerId());
