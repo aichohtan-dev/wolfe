@@ -58,7 +58,7 @@ CI evidence does not certify real production deployment, browser E2E coverage, p
 | WG20-P2-029 | P2 / G5/G7 | EVIDENCE-GATE / targeted tests pending | Verify checkout behavior when email verification is missing and compare UI/API responses. Keep as a test gap until current source plus a failing case confirms a defect. |
 | G4-G6-CONCURRENCY-01 | P2 / G4–G6 | EVIDENCE-GATE | Need deterministic runtime competing-transaction tests for retailer allocation/reservation and proof of stock/settlement invariants. This is not a confirmed bug by itself. |
 | ORDER-LOCK-01 | P2 / G5/G9 | PARTIAL / runtime evidence pending | A source-contract test checks variant-before-inventory locking and deterministic TreeMap ordering. Credit that test; the separate create-versus-cancel deadlock scenario is not yet shown as a deterministic runtime regression test. |
-| ORDER-DISCOUNT-01 | P2 / G5/G6 | FIXED — SOURCE / regression proof pending | `OrderService.create` merges equivalent lines before discount allocation, mitigating the reported duplicate-key collision. Add a regression test submitting duplicate identical lines and asserting merged quantity, discount allocation, and persisted totals; then run it before marking RETEST-PASS. Do not label this OPEN without evidence the source fix regressed. |
+| ORDER-DISCOUNT-01 | P2 / G5/G6 | FIXED — SOURCE / regression proof added, CI pending | Source merges identical product/bundle/configuration/variant lines before discount allocation. Added `duplicateIdenticalLinesMergeBeforeCouponDiscountAllocationAndPersistence` in `backend/src/test/java/com/wolfe/order/OrderServiceTest.java` on the audit branch. It asserts merged quantity, single persisted order line, coupon discount allocation, line net amount, order subtotal/discount/shipping/total, and stock reservation. Mark FIXED + VERIFIED only after the new commit's backend CI passes. |
 | G0-DOC-001 | P2 / G0 | OPEN — CONFIRMED documentation inconsistency | README has a “Next modules” list naming cart/accounts/wishlist/checkout/orders/admin as future work despite these modules existing, plus older V18.7/local dependency notes that conflict with current CI evidence. Rewrite to one current status, distinguish intentional payment deferral from implemented modules, and mark historic notes archival. |
 
 The carry-forward rows are not necessarily unique root causes. Deduplicate historical IDs before counting. Do not claim all ledger entries are bugs, and do not convert missing evidence into a source defect.
@@ -78,23 +78,28 @@ The carry-forward rows are not necessarily unique root causes. Deduplicate histo
 - **TLS and HTTP-to-HTTPS — SOURCE PASS:** `nginx.conf.template` redirects port 80 to HTTPS and configures TLS 1.2/1.3. Docker Verification passed its generated-TLS endpoint/reverse-proxy checks on the audit report commit. This is CI-stack evidence, not production certificate/domain validation.
 - **Security headers — SOURCE PASS, browser-policy validation pending:** Nginx sets HSTS, nosniff, frame denial, Referrer-Policy, Permissions-Policy, CSP, COOP and CORP. Spring Security also sets CSP/frame/referrer/cross-origin headers. No confirmed defect from duplication alone; verify effective response headers in deployed browser flows before release.
 - **Forwarded client address — SOURCE PASS for direct Nginx-to-API topology:** `ops/proxy_params` overwrites `X-Real-IP` and `X-Forwarded-For` with Nginx's `$remote_addr`, preventing a caller-supplied forwarded-for value from being blindly passed through. If another trusted proxy/CDN is placed in front, its trust boundary and real-IP configuration need separate review.
-- **PDF import upload limit — PARTIAL / route coverage pending:** exact `/api/v1/admin/pdf-imports/upload` has a dedicated `wolfe_pdf_upload` limit (5 requests/minute, burst 2) and 50 MB body limit. The wider `/api/v1/admin/pdf-imports/` prefix has the body-size limit but no dedicated upload rate zone. Confirm the actual controller mappings and whether alternate/trailing-slash upload paths exist before treating this as a defect; do not assert bypass without a mapped endpoint/reproduction.
-- **Global API limit — SOURCE PASS:** other `/api/` paths receive the global API limit and request body/time limits. The PDF import prefix is handled earlier, so its behavior should be validated against real mappings as noted above.
-- **HTTP authorization — SOURCE PASS for URL rules:** `SecurityConfig` requires ADMIN/SUPER_ADMIN for `/api/v1/admin/**` and RETAILER for `/api/v1/retailer/**`; CSRF is enabled, CORS origins come from configuration, and the session policy is stateless. This does not substitute for controller/method-level checks on mapped endpoints.
-- **New confirmed security defects from this batch:** none. Remaining items above are route-mapping/browser/production evidence gates, not confirmed vulnerabilities.
+- **PDF import upload limit — SOURCE REVIEW PASS / rate coverage scoped:** exact controller mapping is only `POST /api/v1/admin/pdf-imports/upload`; controller class requires ADMIN/SUPER_ADMIN. That exact Nginx route has a dedicated 5r/m rate zone with burst 2 and a 50 MB body cap. Other mappings are job/media/item management, not alternate uploads. No alternate upload path was found, so no rate-limit bypass is confirmed.
+- **Global API limit — SOURCE PASS:** other `/api/` paths receive the global API limit and request body/time limits. The PDF import prefix is handled earlier, so it does not inherit the global zone.
+- **HTTP authorization — SOURCE PASS for URL rules:** `SecurityConfig` requires ADMIN/SUPER_ADMIN for `/api/v1/admin/**` and RETAILER for `/api/v1/retailer/**`; CSRF is enabled, CORS origins come from configuration, and the session policy is stateless. Mapped method-level permission checks exist in key controllers; systematic negative HTTP tests across the complete map remain pending.
+- **New confirmed security defects from this batch:** none. Remaining items above are mapped-endpoint/browser/production evidence gates, not confirmed vulnerabilities.
+
+## G1 source checks — batch 3 (order discount regression)
+
+- **Source code changed on audit branch:** `backend/src/test/java/com/wolfe/order/OrderServiceTest.java` adds a focused regression test for duplicate identical order lines. Production logic is intentionally unchanged because the merge mitigation already exists.
+- **Expected invariant:** three identical units become one persisted line of quantity 3; coupon discount 5,000 paise is applied once; line net 25,000 paise; subtotal 30,000; discount 5,000; standard shipping 19,900; total 44,900; inventory reservation 3.
+- **Verification state:** source/test file is committed, but CI has not yet reported for the new commit. This is NOT a test PASS until GitHub Actions completes successfully. The new test is a Mockito unit test, not a PostgreSQL concurrency/runtime proof.
 
 ## Next steps (G1 → G2)
 
-1. Add and run the duplicate-identical-order-lines regression test; assert merged quantity, discount allocation, and persisted totals.
-2. Enumerate actual PDF-import controller mappings and verify all upload paths are rate-limited; only patch if an alternate mapped path is confirmed.
-3. Inspect mapped admin/retailer endpoints for method-level authorization and DTO leakage, recording exact endpoints and tests; don't reopen already verified URL-role fixes.
-4. Add/confirm negative HTTP tests for invalid/expired JWTs on representative public and protected mapped endpoints.
-5. Verify checkout email-verification behavior from current source and targeted positive/negative tests.
-6. Add deterministic PostgreSQL concurrency tests for create/cancel lock ordering and retailer allocation; retain existing passing source-contract tests as evidence.
-7. Collect production Flyway history evidence without changing migration history based on assumptions.
-8. Keep G11 browser E2E, G12 production-like deployment/observability, and G13 independent acceptance as explicit release evidence gates.
-9. Reconcile the README and label older audit snapshots as archival; preserve previously fixed/verified status unless a specific regression is reproduced.
+1. Run the new duplicate-identical-order-lines regression test through backend CI; reconcile any mock/signature/test failures before marking verified.
+2. Inspect mapped admin/retailer endpoints for method-level authorization and DTO leakage, recording exact endpoints and tests; don't reopen already verified URL-role fixes.
+3. Add/confirm negative HTTP tests for invalid/expired JWTs on representative public and protected mapped endpoints.
+4. Verify checkout email-verification behavior from current source and targeted positive/negative tests.
+5. Add deterministic PostgreSQL concurrency tests for create/cancel lock ordering and retailer allocation; retain existing passing source-contract tests as evidence.
+6. Collect production Flyway history evidence without changing migration history based on assumptions.
+7. Keep G11 browser E2E, G12 production-like deployment/observability, and G13 independent acceptance as explicit release evidence gates.
+8. Reconcile the README and label older audit snapshots as archival; preserve previously fixed/verified status unless a specific regression is reproduced.
 
 ## Certification statement
 
-This file records a **G0 baseline freeze and initial G1 source rechecks**, not full G1 completion and not release certification. Both workflows passed for frozen main, and both workflows also passed for the audit-report commit listed above. Historical closures are preserved; outstanding items are scoped test/evidence gates or confirmed capability/documentation gaps, not an instruction to reopen every old finding.
+This file records a **G0 baseline freeze and initial G1 source rechecks**, not full G1 completion and not release certification. Both workflows passed for frozen main, and both workflows also passed for the prior audit-report commit listed above. A new regression-test commit has now been added and is awaiting its own CI evidence. Historical closures are preserved; outstanding items are scoped test/evidence gates or confirmed capability/documentation gaps, not an instruction to reopen every old finding.
