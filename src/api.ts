@@ -245,6 +245,9 @@ export const api = {
     changePassword: (currentPassword: string, newPassword: string) => request<void>('/customers/password', { method: 'POST', body: JSON.stringify({ currentPassword, newPassword }) }),
     deleteAccount: () => request<void>('/customers/me', { method: 'DELETE' }),
     requestEmailVerification: (email: string) => request<void>('/customers/verify-email/request', { method: 'POST', body: JSON.stringify({ email }) }),
+    confirmEmailVerification: (token: string) => request<void>(`/customers/verify-email/confirm?token=${encodeURIComponent(token)}`, { method: 'POST' }),
+    requestPasswordReset: (email: string) => request<void>('/customers/password-reset/request', { method: 'POST', body: JSON.stringify({ email }) }),
+    confirmPasswordReset: (token: string, newPassword: string) => request<void>('/customers/password-reset/confirm', { method: 'POST', body: JSON.stringify({ token, newPassword }) }),
     logout: async () => {
         try { await request<void>('/customers/logout', { method: 'POST' }, false); }
         finally { localStorage.removeItem('wolfe_user'); }
@@ -323,8 +326,11 @@ export const api = {
         readAll: (id: number) => request<any>(`/customers/${id}/notifications/read-all`, { method: 'POST' })
     },
     reviews: {
-        get: (slug: string) => request<any>(`/reviews/product/${encodeURIComponent(slug)}`),
-        create: (slug: string, body: { rating: number; review: string }) => request<any>(`/reviews/product/${encodeURIComponent(slug)}`, { method: 'POST', body: JSON.stringify(body) })
+        get: (slug: string, page = 0, pageSize = 20) => request<any>(`/reviews/product/${encodeURIComponent(slug)}/page?page=${page}&pageSize=${pageSize}`),
+        mine: (slug: string) => request<any>(`/reviews/product/${encodeURIComponent(slug)}/mine`),
+        create: (slug: string, body: { rating: number; review: string }) => request<any>(`/reviews/product/${encodeURIComponent(slug)}`, { method: 'POST', body: JSON.stringify(body) }),
+        update: (id: number, body: { rating: number; review: string }) => request<any>(`/reviews/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+        remove: (id: number) => request<void>(`/reviews/${id}`, { method: 'DELETE' })
     },
     quotes: {
         get: (id: number) => request<any[]>(`/quotes/customers/${id}`),
@@ -395,6 +401,12 @@ export const api = {
         deleteProduct: (id: number) => request<void>(`/admin/products/${id}`, { method: 'DELETE' }),
         inventory: () => request<any[]>('/admin/inventory'),
         stockAlerts: () => request<any[]>('/admin/stock-alerts'),
+        inventoryReconciliation: () => request<any[]>('/admin/inventory/reconciliation'),
+        staffAlerts: (page = 0, size = 50) => request<any>(`/admin/staff-alerts?page=${page}&size=${size}`),
+        acknowledgeStaffAlert: (id: number) => request<any>(`/admin/staff-alerts/${id}/ack`, { method: 'POST' }),
+        inventoryReconciliation: () => request<any[]>('/admin/inventory/reconciliation'),
+        staffAlerts: (page = 0, size = 50) => request<any>(`/admin/staff-alerts?page=${page}&size=${size}`),
+        acknowledgeStaffAlert: (id: number) => request<any>(`/admin/staff-alerts/${id}/ack`, { method: 'POST' }),
         updateStock: (productId: number, quantity: number) => request<any>(`/admin/inventory/${productId}`, { method: 'PUT', body: JSON.stringify({ quantity }) }),
         orders: () => request<any[]>('/admin/orders'),
         orderHistory: (id: string) => request<any[]>(`/admin/order-history/${encodeURIComponent(id)}`),
