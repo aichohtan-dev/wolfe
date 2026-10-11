@@ -263,3 +263,18 @@ This file records a **G0 baseline freeze and initial G1 source rechecks**, not f
 1. Check latest CI and Docker Verification for `74dd6bd2745c0e7d5e5c02b5e8875ba162c30d47`.
 2. If tests fail, inspect logs and repair test setup/assertions without weakening the expected state-transition invariants.
 3. Continue audit of recovery and settlement amounts for overflow, duplicate recovery, and post-reconciliation mutation risks only where source demonstrates an uncovered invariant.
+
+
+## G1 source checks — batch 15 (confirmed duplicate-payout state regression)
+
+- **Confirmed source defect:** `RetailerSettlement.markRecoveryCollected` unconditionally changed status to `ELIGIBLE`, even when `settledAt` proved the original payout had already completed. `RetailerSettlementService.markSettled` permits payout whenever status is ELIGIBLE and calculates `retailerPayableAmount - adjustmentAmount`; for post-payout returns the recovery is stored in `recoveryDueAmount` while `adjustmentAmount` may remain zero. Thus recovery collection could reopen a previously paid settlement and permit the original payout amount to be paid a second time.
+- **Production fix:** `RetailerSettlement.markRecoveryCollected` now preserves `SETTLED` when `settledAt != null`; only pre-payout recovery returns the settlement to `ELIGIBLE`. Existing status validation remains unchanged.
+- **Regression test updated:** `recoveryCollectionClearsRecoveryAndAllowsNormalEligiblePayout` now asserts post-payout recovery collection leaves status SETTLED, preserves the original bank reference, and a second `markSettled` call throws without a second save/audit.
+- **Status:** source fix + regression test committed on audit branch (source commit `a1b16bbe33ca0449d40dbd35fc56b7c79f543fbe`; test commit `2c33a18dede0c92fa19277890939d724cf06a669`). CI and Docker Verification for the latest branch head are pending; do not call it verified until they pass.
+- This is a confirmed settlement state-machine defect; unlike earlier test-only mapping errors, production source was changed. No OTP/authentication code was touched.
+
+## Next steps
+
+1. Verify CI and Docker Verification for the latest commit containing the post-recovery no-repayout fix.
+2. Inspect failures from the new cash/recovery tests and repair source/test only based on evidence.
+3. If green, inspect `setCashExpected` call sites and settlement amount invariants; change production code only for a confirmed reachable unsafe state.
