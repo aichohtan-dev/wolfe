@@ -109,7 +109,7 @@ This file records a **G0 baseline freeze and initial G1 source rechecks**, not f
 
 - **Mapped object ownership invariant:** `CustomerAddressController.update` and `delete` both load the requested address and filter by `customerId` before mutating it. The controller's list/create/update/delete methods also call `CustomerAccess.requireCustomer` for the path customer. Source inspection found no confirmed IDOR in these methods.
 - **Regression test added:** `backend/src/test/java/com/wolfe/address/CustomerAddressControllerSecurityTest.java` tests cross-customer address ID lookup for update/delete and a mismatched customer ID for list. The tests assert that no repository mutation happens after a foreign address is supplied.
-- **Verification state:** test committed on the audit branch; CI for the commit containing this new test is pending. Do not mark PASS until backend CI succeeds.
+- **Verification state:** FIXED + CI-VERIFIED for the unit-test scenario on audit commit `f9254667c28b5082729f94db78772073d68e17fc`; Wolfe CI passed, including the new address ownership regression test. This does not replace deployed runtime/E2E evidence.
 - **Order duplicate-line regression:** commit `dafd671c9098ec5c6bd2f14656a37bfdc2de4bff` passed both Wolfe CI and Docker Verification. The duplicate-identical-lines regression test is therefore **FIXED + CI-VERIFIED for this unit-test scenario**; deterministic database concurrency remains a separate evidence gate.
 
 ## Next steps (G1 continuation)
@@ -134,3 +134,18 @@ This file records a **G0 baseline freeze and initial G1 source rechecks**, not f
 2. If a test fails, inspect the actual failure logs and repair the test/setup without removing security assertions.
 3. Continue endpoint mapping and DTO boundary checks; only patch production source when a concrete defect is shown.
 4. Keep G11 browser E2E, production Flyway compatibility, production-like deployment/observability, and independent G13 acceptance as evidence gates.
+
+
+## G1 source checks — batch 6 (admin DTO/entity boundary review)
+
+- **Admin/retailer route boundary:** reviewed mapped handlers in `AdminController`, `AdminRetailerController`, `StaffAlertController`, `InventoryReconciliationController`, and `PdfImportController`. The controllers are under the `/api/v1/admin/**` URL rule, and the inspected classes with direct annotations require ADMIN/SUPER_ADMIN. No unauthenticated route bypass was confirmed in this source pass.
+- **Entity-returning admin endpoints:** several admin handlers return JPA entities directly (for example categories, coupons, visual content, accessories, retailer inventory/settlements and PDF import items). These are privileged routes, so direct entity serialization is not by itself a public data leak. Field-by-field DTO serialization tests remain a scoped hardening gap; only treat as a defect if a concrete sensitive field or relationship is exposed to an unauthorized role or causes an actual serialization leak.
+- **Security finding result:** no new confirmed authorization/DTO vulnerability from the reviewed paths. Existing URL-role fixes remain closed. Broader negative HTTP tests across every mapped handler and serialization assertions for sensitive DTO/entity fields remain incomplete.
+- **CI evidence:** Wolfe CI passed for `f9254667c28b5082729f94db78772073d68e17fc`, including address ownership and checkout email-verification regression tests. Docker Verification for that same commit was still running at the time of this update; do not infer its final result.
+
+## Next steps (G1 continuation)
+
+1. Recheck Docker Verification for the latest report/test commit and record its final conclusion.
+2. Add targeted HTTP authorization tests for representative admin and retailer handlers where existing role-matrix tests do not exercise actual controller mappings.
+3. Review sensitive fields on entity-returning admin endpoints and convert to explicit DTOs only when a concrete exposure/serialization risk is established.
+4. Keep production Flyway history, browser E2E, production-like deployment/observability, and independent G13 acceptance as evidence gates.
