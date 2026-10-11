@@ -9,7 +9,7 @@ import com.wolfe.catalog.ProductRepository;
 import com.wolfe.catalog.ProductVariantRepository;
 import com.wolfe.discount.CouponRepository;
 import com.wolfe.discount.CouponService;
-import com.wolfe.experience.ConfigurationRepository;
+import com.wolfe.experience.ConfigurationService;
 import com.wolfe.inventory.InventoryRepository;
 import com.wolfe.notification.NotificationService;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,7 +30,7 @@ class OrderServiceTest {
     @Mock CouponRepository coupons;
     @Mock OrderStatusHistoryRepository history;
     @Mock NotificationService notifications;
-    @Mock ConfigurationRepository configurations;
+    @Mock ConfigurationService configurations;
     @Mock BundleRepository bundles;
     @Mock BundleItemRepository bundleItems;
 

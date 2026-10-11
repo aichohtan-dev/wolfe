@@ -6,7 +6,7 @@ import com.wolfe.catalog.ProductRepository;
 import com.wolfe.catalog.ProductVariantRepository;
 import com.wolfe.discount.CouponRepository;
 import com.wolfe.discount.CouponService;
-import com.wolfe.experience.ConfigurationRepository;
+import com.wolfe.experience.ConfigurationService;
 import com.wolfe.inventory.InventoryRepository;
 import com.wolfe.notification.NotificationService;
 import org.junit.jupiter.api.Test;
@@ -26,7 +26,7 @@ class OrderServiceValidationTest {
             Mockito.mock(CouponRepository.class),
             Mockito.mock(OrderStatusHistoryRepository.class),
             Mockito.mock(NotificationService.class),
-            Mockito.mock(ConfigurationRepository.class),
+            Mockito.mock(ConfigurationService.class),
             Mockito.mock(BundleRepository.class),
             Mockito.mock(BundleItemRepository.class)
         );
