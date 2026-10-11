@@ -221,4 +221,42 @@ public class RetailerSettlementServiceTest {
         verify(settlementRepo, never()).save(any());
     }
 
+
+    @Test
+    void initializeSettlementRejectsInconsistentGrossMarginAndPayableAmounts() {
+        assertThrows(IllegalArgumentException.class,
+                () -> service.initializeSettlement("WLF-BAD-AMOUNTS", 7L, 10000L, 1000L, 8500L));
+        verify(settlementRepo, never()).save(any());
+        verifyNoInteractions(auditRepo);
+    }
+
+    @Test
+    void initializeSettlementRejectsNegativeAmountsAndInvalidIdentity() {
+        assertThrows(IllegalArgumentException.class,
+                () -> service.initializeSettlement("WLF-NEGATIVE", 7L, 10000L, -1L, 10001L));
+        assertThrows(IllegalArgumentException.class,
+                () -> service.initializeSettlement("WLF-ZERO-GROSS", 7L, 0L, 0L, 0L));
+        assertThrows(IllegalArgumentException.class,
+                () -> service.initializeSettlement(" ", 7L, 10000L, 1000L, 9000L));
+        assertThrows(IllegalArgumentException.class,
+                () -> service.initializeSettlement("WLF-INVALID-RETAILER", 0L, 10000L, 1000L, 9000L));
+        verify(settlementRepo, never()).save(any());
+        verifyNoInteractions(auditRepo);
+    }
+
+    @Test
+    void initializeSettlementAcceptsConsistentAmountsAndPersistsOnce() {
+        when(settlementRepo.findTopByOrderIdAndRetailerIdOrderByIdDesc("WLF-VALID-AMOUNTS", 7L))
+                .thenReturn(Optional.empty());
+        when(settlementRepo.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        RetailerSettlement created = service.initializeSettlement("WLF-VALID-AMOUNTS", 7L, 10000L, 1000L, 9000L);
+
+        assertEquals(10000L, created.getGrossAmount());
+        assertEquals(1000L, created.getWolfeMarginAmount());
+        assertEquals(9000L, created.getRetailerPayableAmount());
+        verify(settlementRepo, times(1)).save(any(RetailerSettlement.class));
+        verify(auditRepo, times(1)).save(any(RetailerAuditLog.class));
+    }
+
 }
