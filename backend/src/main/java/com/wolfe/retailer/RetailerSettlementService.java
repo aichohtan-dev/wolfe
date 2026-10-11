@@ -72,6 +72,17 @@ public class RetailerSettlementService {
 
     @Transactional
     public RetailerSettlement initializeSettlement(String orderId, Long retailerId, long grossAmount, long wolfeMarginAmount, long retailerPayableAmount) {
+        if (orderId == null || orderId.isBlank()) {
+            throw new IllegalArgumentException("settlement order ID is required");
+        }
+        if (retailerId == null || retailerId <= 0) {
+            throw new IllegalArgumentException("settlement retailer ID must be positive");
+        }
+        if (grossAmount <= 0 || wolfeMarginAmount < 0 || retailerPayableAmount < 0
+                || wolfeMarginAmount > grossAmount || retailerPayableAmount > grossAmount
+                || wolfeMarginAmount != grossAmount - retailerPayableAmount) {
+            throw new IllegalArgumentException("settlement amounts must be non-negative and margin plus retailer payable must equal gross amount");
+        }
         Optional<RetailerSettlement> existing = settlementRepo.findTopByOrderIdAndRetailerIdOrderByIdDesc(orderId, retailerId);
         if (existing.isPresent() && !"ADJUSTED".equalsIgnoreCase(existing.get().getStatus())) {
             return existing.get();
