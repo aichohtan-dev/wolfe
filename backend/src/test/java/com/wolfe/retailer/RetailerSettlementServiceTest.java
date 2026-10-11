@@ -173,4 +173,27 @@ public class RetailerSettlementServiceTest {
         verify(auditRepo, times(1)).save(any(RetailerAuditLog.class));
     }
 
+
+    @Test
+    void cashReconciliationReplayCannotReplaceRecordedReferenceOrAmounts() {
+        RetailerSettlement eligible = new RetailerSettlement("WLF-CASH-REPLAY", 7L, 10000L, 1000L, 9000L);
+        eligible.setCashExpected(9000L);
+        eligible.markEligible();
+        when(settlementRepo.findByIdForUpdate(55L)).thenReturn(Optional.of(eligible));
+        when(settlementRepo.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        RetailerSettlement reconciled = service.reconcileCash(
+                55L, 9000L, 9000L, 9000L, "CASH-REF-ORIGINAL", "admin");
+        assertEquals("RECONCILED", reconciled.getCashReconciliationStatus());
+
+        assertThrows(IllegalStateException.class,
+                () -> service.reconcileCash(55L, 9000L, 9000L, 9000L, "CASH-REF-REPLAY", "admin"));
+
+        assertEquals("CASH-REF-ORIGINAL", reconciled.getCashReconciliationReference());
+        assertEquals(9000L, reconciled.getCashCollectedAmount());
+        assertEquals(9000L, reconciled.getCashDepositedAmount());
+        verify(settlementRepo, times(1)).save(eligible);
+        verify(auditRepo, times(1)).save(any(RetailerAuditLog.class));
+    }
+
 }
