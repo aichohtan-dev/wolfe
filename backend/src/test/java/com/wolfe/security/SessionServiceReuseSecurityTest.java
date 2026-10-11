@@ -31,6 +31,25 @@ class SessionServiceReuseSecurityTest {
         verify(customers).save(c);
     }
 
+    @Test void expiredRefreshTokenDoesNotTriggerReuseRevocation() {
+        var repo = mock(RefreshTokenRepository.class);
+        var customers = mock(CustomerRepository.class);
+        var jwt = mock(JwtService.class);
+        var service = new SessionService(repo, customers, jwt, 3600L, 5);
+
+        var c = new Customer("Test", "test@example.com", "hash");
+        setId(c, 42L);
+        var expired = new RefreshToken(42L, SessionService.hash("expired"), Instant.now().minusSeconds(1));
+
+        when(repo.findByTokenHashForUpdate(anyString())).thenReturn(Optional.of(expired));
+        when(customers.findByIdForUpdate(42L)).thenReturn(Optional.of(c));
+
+        assertThrows(IllegalArgumentException.class, () -> service.rotate("expired"));
+        assertEquals(0L, c.getSessionVersion());
+        verify(repo, never()).revokeAllByCustomerId(anyLong(), any(Instant.class));
+        verify(customers, never()).save(c);
+    }
+
     private static void setId(Customer c, Long id) {
         try {
             var f = Customer.class.getDeclaredField("id");
