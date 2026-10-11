@@ -128,6 +128,9 @@ public class RetailerSettlementService {
     public RetailerSettlement reconcileCash(Long settlementId, long expected, long collected, long deposited, String reference, String actor) {
         RetailerSettlement s = settlementRepo.findByIdForUpdate(settlementId).orElseThrow(() -> new IllegalArgumentException("Settlement not found"));
         if (!"ELIGIBLE".equalsIgnoreCase(s.getStatus())) throw new IllegalStateException("COD cash can only be reconciled for an ELIGIBLE settlement");
+        if ("RECONCILED".equalsIgnoreCase(s.getCashReconciliationStatus())) {
+            throw new IllegalStateException("COD cash is already reconciled; use an audited correction workflow");
+        }
         if (expected != s.getCashExpectedAmount()) throw new IllegalArgumentException("cash expected amount must match the server-calculated order amount");
         s.reconcileCash(expected, collected, deposited, reference);
         RetailerSettlement saved = settlementRepo.save(s);
