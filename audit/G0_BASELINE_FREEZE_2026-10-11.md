@@ -149,3 +149,18 @@ This file records a **G0 baseline freeze and initial G1 source rechecks**, not f
 2. Add targeted HTTP authorization tests for representative admin and retailer handlers where existing role-matrix tests do not exercise actual controller mappings.
 3. Review sensitive fields on entity-returning admin endpoints and convert to explicit DTOs only when a concrete exposure/serialization risk is established.
 4. Keep production Flyway history, browser E2E, production-like deployment/observability, and independent G13 acceptance as evidence gates.
+
+
+## G1 source checks — batch 7 (mapped admin-retailer authorization)
+
+- **Mapped endpoint test added:** `backend/src/test/java/com/wolfe/retailer/AdminRetailerControllerHttpSecurityTest.java` exercises the real `GET /api/v1/admin/retailers` mapping, rather than an intentionally unmapped probe. It asserts 401 for anonymous, 403 for CUSTOMER, and 403 for a principal with ROLE_ADMIN but without the controller's explicit `PERM_ADMIN_RETAILER` authority.
+- **Permission design checked:** `AdminRetailerController` requires `PERM_ADMIN_RETAILER`; `RolePermissions.forRole("ADMIN")` and `RolePermissions.forRole("SUPER_ADMIN")` grant this permission, and `JwtAuthFilter` maps role permissions into `PERM_*` authorities. Therefore the controller permission requirement is aligned with production JWT authority construction; no authorization bypass or accidental permission grant was confirmed.
+- **Verification state:** new integration test committed on audit branch at `ce7987261b6464be5600c5571d62733ad8925f0d`; its Wolfe CI run `38145903341` is queued and Docker Verification run `38145903304` is in progress. Do not mark the new test PASS until the corresponding CI run completes.
+- **Previously verified checks preserved:** checkout email-verification and customer-address ownership regression tests passed Wolfe CI on commit `f9254667c28b5082729f94db78772073d68e17fc`; Docker Verification also passed for that commit. Newer commits have their own workflow status and must not inherit earlier Docker status.
+
+## Next steps (G1 continuation)
+
+1. Wait for Wolfe CI on `ce7987261b6464be5600c5571d62733ad8925f0d`; inspect logs and fix any failing test without weakening the expected 401/403 assertions.
+2. Continue with one or two actual mapped admin endpoints that mutate state, testing anonymous/customer rejection and permission-gated behavior.
+3. Inspect retailer-scoped entity serialization and DTO fields with exact source evidence; do not mark direct entity serialization as a leak without a sensitive field exposure.
+4. Keep production Flyway history, browser E2E, production-like deployment/observability, and independent G13 acceptance as evidence gates.
