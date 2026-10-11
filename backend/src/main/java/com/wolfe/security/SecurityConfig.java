@@ -2,6 +2,7 @@ package com.wolfe.security;
 
 import java.util.List;
 import org.springframework.context.annotation.*;
+import org.springframework.beans.factory.annotation.Qualifier;
 import com.wolfe.config.WolfeSecurityProperties;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -20,7 +21,7 @@ public class SecurityConfig {
     }
 
     @Bean SecurityFilterChain security(HttpSecurity http, JwtAuthFilter jwt, SecurityEventLogger events,
-                                       CorsConfigurationSource cors) throws Exception {
+                                       @Qualifier("corsConfigurationSource") CorsConfigurationSource cors) throws Exception {
         http.csrf(c -> c.csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse()))
         .exceptionHandling(e -> e
             .authenticationEntryPoint((req,res,ex) -> { res.setStatus(401); res.setContentType(MediaType.APPLICATION_JSON_VALUE); events.denied(req,401,"authentication_required"); res.getWriter().write("{\"error\":\"UNAUTHORIZED\",\"message\":\"Authentication required\"}"); })
