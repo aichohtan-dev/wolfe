@@ -10,6 +10,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.http.MediaType;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
@@ -89,6 +90,15 @@ class AdminRetailerControllerHttpSecurityTest {
                                 }
                                 """))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void adminWithExplicitRetailerPermissionCanReadMappedEndpoint() throws Exception {
+        mvc.perform(get("/api/v1/admin/retailers")
+                        .with(user("admin").authorities(
+                                new SimpleGrantedAuthority("ROLE_ADMIN"),
+                                new SimpleGrantedAuthority("PERM_ADMIN_RETAILER"))))
+                .andExpect(status().isOk());
     }
 
     @Test
