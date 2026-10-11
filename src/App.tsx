@@ -115,7 +115,10 @@ function App() {
         if (user) {
             for (const line of b.items || []) {
                 const lineItem = next.find(x => x.id === line.slug && x.bundleId === Number(b.id) && !x.configurationToken);
-                if (lineItem) void api.cart.put(user.id, lineItem.id, lineItem.qty, lineItem.variantId, lineItem.bundleId).catch(() => {});
+                if (lineItem) {
+                    try { await api.cart.put(user.id, lineItem.id, lineItem.qty, lineItem.variantId, lineItem.bundleId); }
+                    catch { await syncAccount(user); }
+                }
             }
         }
     };
@@ -255,7 +258,7 @@ function App() {
             const item = next.find(same)!;
             try {
                 await api.cart.put(user.id, id, item.qty, variant?.id, item.bundleId, item.configurationToken);
-            } catch { }
+            } catch { await syncAccount(user); }
         }
     };
 
@@ -267,7 +270,10 @@ function App() {
         setDrawer(true);
         if (user) {
             const item = next.find(x => x.id === id && x.configurationToken === configurationToken);
-            if (item) void api.cart.put(user.id, id, item.qty, item.variantId, item.bundleId, configurationToken).catch(() => {});
+            if (item) {
+                try { await api.cart.put(user.id, id, item.qty, item.variantId, item.bundleId, configurationToken); }
+                catch { await syncAccount(user); }
+            }
         }
     };
 
@@ -314,7 +320,7 @@ function App() {
                 } else {
                     await api.cart.put(user.id, id, n, variantId, undefined, configurationToken);
                 }
-            } catch { }
+            } catch { await syncAccount(user); }
         }
     };
 
@@ -334,7 +340,7 @@ function App() {
             try {
                 if (adding) await api.wishlist.add(user.id, id);
                 else await api.wishlist.remove(user.id, id);
-            } catch { }
+            } catch { await syncAccount(user); }
         }
     };
 
