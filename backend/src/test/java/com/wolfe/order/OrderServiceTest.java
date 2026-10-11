@@ -90,7 +90,6 @@ class OrderServiceTest {
     void duplicateIdenticalLinesMergeBeforeCouponDiscountAllocationAndPersistence() {
         Product product = mock(Product.class);
         when(product.getId()).thenReturn(11L);
-        when(product.getSlug()).thenReturn("widget");
         when(product.getName()).thenReturn("Widget");
         when(product.getPrice()).thenReturn(new BigDecimal("100.00"));
         when(product.isActive()).thenReturn(true);
