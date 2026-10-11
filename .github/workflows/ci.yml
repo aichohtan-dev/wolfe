@@ -53,7 +53,10 @@ jobs:
       - run: chmod +x backend/mvnw
       - name: Generate ephemeral backend test secret
         shell: bash
-        run: printf 'WOLFE_JWT_SECRET=%s\n' "$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+        run: |
+          jwt_secret="$(openssl rand -hex 32)"
+          printf '::add-mask::%s\n' "$jwt_secret"
+          printf 'WOLFE_JWT_SECRET=%s\n' "$jwt_secret" >> "$GITHUB_ENV"
       - run: backend/mvnw -q test
         env:
           DATABASE_URL: jdbc:postgresql://localhost:5432/wolfe
