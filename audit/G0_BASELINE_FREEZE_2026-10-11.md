@@ -244,3 +244,22 @@ This file records a **G0 baseline freeze and initial G1 source rechecks**, not f
 - Corrected all three settlement authorization test URLs to the actual mapped route in commit `53cb7e8fc22457dd3716890aed9563b21c91536d`. Kept 401/403 assertions unchanged; did not weaken tests or change production source.
 - Added service-level tests in `RetailerSettlementServiceTest` for refusing PENDING -> SETTLED and rejecting replay after a successful settlement without a second save/audit event. These are in earlier commit `e5317a9fbdb603a68ba4c79349cd432bf4f3ded1`.
 - **Verification state:** correction pushed to audit branch. CI must pass on latest commit before closing this test batch; older workflow outcomes do not verify the correction.
+
+
+## G1 source checks — batch 14 (cash reconciliation and recovery transitions)
+
+- CI verification completed for corrected settlement-route tests on commit `5d5954e32b60a56b01d9f3dac1822c1b49bc94cb`: Wolfe CI PASS and Docker Verification PASS.
+- Added service-level regression tests to `RetailerSettlementServiceTest`:
+  - cash reconciliation from PENDING must reject without save/audit;
+  - mismatched collected vs expected/deposited amounts must reject without save/audit;
+  - recovery collection when no recovery is due must reject without save/audit;
+  - valid recovery collection clears recovery due, returns status to ELIGIBLE, and permits normal settlement flow.
+- These tests exercise source rules already present in `RetailerSettlementService` / `RetailerSettlement`; no production code was changed in this batch.
+- Test commit: `74dd6bd2745c0e7d5e5c02b5e8875ba162c30d47`. CI and Docker Verification for this commit must finish before the new tests are marked verified.
+- Scope note: tests use service/entity behavior with mocked repositories; they do not replace real PostgreSQL concurrent transaction or deployed API E2E evidence.
+
+## Next steps
+
+1. Check latest CI and Docker Verification for `74dd6bd2745c0e7d5e5c02b5e8875ba162c30d47`.
+2. If tests fail, inspect logs and repair test setup/assertions without weakening the expected state-transition invariants.
+3. Continue audit of recovery and settlement amounts for overflow, duplicate recovery, and post-reconciliation mutation risks only where source demonstrates an uncovered invariant.
