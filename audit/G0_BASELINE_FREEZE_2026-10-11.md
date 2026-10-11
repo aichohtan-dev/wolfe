@@ -294,3 +294,19 @@ This file records a **G0 baseline freeze and initial G1 source rechecks**, not f
 1. Verify CI and Docker Verification for the latest cash-reconciliation replay fix.
 2. If green, inspect `setCashExpected` call sites and ensure expected amounts cannot be changed after reconciliation or payout; patch only with confirmed reachable source evidence.
 3. Preserve prior closed fixes and distinguish source-corrected from CI-verified status.
+
+
+## G1 source checks — batch 17 (cash expected amount immutability)
+
+- **Verification:** commit `5b701b4590873f9b0c0c6fc973581c5f398ff4a7` passed Wolfe CI and Docker Verification; this includes the cash reconciliation replay guard and test.
+- **Confirmed source defect found:** `RetailerSettlementService.setCashExpected` previously updated the expected COD cash amount in any settlement state and reset reconciliation status to PENDING. No production controller call site was found in the inspected controller, but the public service method can be called by internal workflows/tests and was not enforcing a lifecycle invariant.
+- **Production fix:** restrict setting expected cash to `PENDING` only, and reject any attempt to reset already `RECONCILED` cash without an audited correction workflow.
+- **Regression tests added:** changing expected cash after transition to ELIGIBLE is rejected without save; changing it after reconciliation is rejected and the recorded amount/reference remain unchanged.
+- Commits: source fix `b90c5e19a8414c002aedacbd088f21f65ad91399`; tests `3f3310c5423c20d008213d844319d4dd8b7437eb`. Latest CI and Docker Verification must complete before these tests are marked verified.
+- No OTP/authentication code changed; main remains unchanged.
+
+## Next steps
+
+1. Verify latest CI and Docker Verification for commit `3f3310c5423c20d008213d844319d4dd8b7437eb`.
+2. If green, review settlement initialization inputs for amount arithmetic/consistency and duplicate order+retailer settlement creation under concurrency.
+3. Keep all previously verified fixes closed and distinguish source-fixed from CI-verified.
