@@ -7,7 +7,7 @@
 - Frozen commit: `86208f6edf5bbb7104dc26bdf806c01970818692`
 - Commit URL: https://github.com/aichohtan-dev/wolfe/commit/86208f6edf5bbb7104dc26bdf806c01970818692
 - Audit work branch: `audit/g0-baseline-2026-10-11`
-- Scope: G0 baseline/evidence control, with initial G1 architecture/security source recheck.
+- Scope: G0 baseline/evidence control, with G1 architecture/security source rechecks.
 - Rule: no source/static finding is marked runtime-verified unless the exact run/command is evidenced. No changes are made directly to `main`.
 
 ## Audit status policy — preserve prior closures
@@ -28,8 +28,10 @@ The rows below are a reconciliation of release/certification evidence, not a who
 
 | Evidence | Result | Link |
 |---|---|---|
-| Wolfe CI | PASS at frozen SHA; frontend typecheck/lint/build/contract/security steps passed; backend Maven tests passed against CI services; dependency/secret checks passed | https://github.com/aichohtan-dev/wolfe/actions/runs/38144338357 |
-| Docker Verification | PASS at frozen SHA; Compose validation/build/start, PostgreSQL/API health, DB integrity preflight, encrypted backup and isolated PostgreSQL restore, endpoint/reverse-proxy checks passed | https://github.com/aichohtan-dev/wolfe/actions/runs/38144338442 |
+| Frozen-main Wolfe CI | PASS at frozen SHA; frontend typecheck/lint/build/contract/security steps passed; backend Maven tests passed against CI services; dependency/secret checks passed | https://github.com/aichohtan-dev/wolfe/actions/runs/38144338357 |
+| Frozen-main Docker Verification | PASS at frozen SHA; Compose validation/build/start, PostgreSQL/API health, DB integrity preflight, encrypted backup and isolated PostgreSQL restore, endpoint/reverse-proxy checks passed | https://github.com/aichohtan-dev/wolfe/actions/runs/38144338442 |
+| Audit-branch Wolfe CI | PASS for audit report commit `5475e932ca8187cf6b78419caa6282e578b5027f`; frontend, backend, contract and security jobs passed | https://github.com/aichohtan-dev/wolfe/actions/runs/38145000817 |
+| Audit-branch Docker Verification | PASS for audit report commit `5475e932ca8187cf6b78419caa6282e578b5027f`; stack health, DB preflight, encrypted backup/restore and reverse-proxy checks passed | https://github.com/aichohtan-dev/wolfe/actions/runs/38145000787 |
 | Flyway source inventory | Migrations V1–V13 and V15–V62 exist; V14 is intentionally absent and V56 documents the gap | https://github.com/aichohtan-dev/wolfe/blob/86208f6edf5bbb7104dc26bdf806c01970818692/docs/MIGRATION_HISTORY.md |
 | Orchestrator | `agents.yaml` lists 20 agent identities, but `run.py` is a fail-closed validator and explicitly says the provider execution adapter is not enabled | https://github.com/aichohtan-dev/wolfe/blob/86208f6edf5bbb7104dc26bdf806c01970818692/audit/orchestrator/run.py |
 | Reporting policy | Runtime PASS requires execution of the exact artifact and recorded evidence | https://github.com/aichohtan-dev/wolfe/blob/86208f6edf5bbb7104dc26bdf806c01970818692/docs/REPORTING_POLICY.md |
@@ -61,7 +63,7 @@ CI evidence does not certify real production deployment, browser E2E coverage, p
 
 The carry-forward rows are not necessarily unique root causes. Deduplicate historical IDs before counting. Do not claim all ledger entries are bugs, and do not convert missing evidence into a source defect.
 
-## G1 preliminary source checks
+## G1 source checks — batch 1
 
 - **JWT filter / public-route behavior — FIXED + CI-VERIFIED for tested cases:** source catches token parsing/authentication failures, clears the security context, and continues the chain so authorization rules decide whether a route can be anonymous. CI security tests passed. Keep broader mapped-endpoint negative coverage as a scoped test gap, not a reopening of the fixed cookie-handling bug.
 - **Refresh-token reuse — FIXED + backend-CI-VERIFIED for existing tests:** source uses `@Transactional(noRollbackFor = InvalidRefreshTokenReuseException.class)`, locks the customer, revokes the token family, increments session version, and saves the customer before raising the dedicated exception. Security tests are present and backend CI passed. A deterministic multi-session race test is additional assurance, not grounds to reopen the fix without a regression.
@@ -71,17 +73,28 @@ The carry-forward rows are not necessarily unique root causes. Deduplicate histo
 - **Lock ordering — SOURCE-CONTRACT TEST PRESENT:** existing checks are useful and remain credited; they are not the same as a deterministic concurrent create/cancel runtime test.
 - **Historical documentation — ARCHIVAL LABEL NEEDED:** `WOLFE_G5_G13_FINAL_GATE_STATUS.md` and README contain V49/V18.7-era runtime limitation statements. Mark historical snapshots as archival/superseded rather than carrying their old runtime status forward as current.
 
+## G1 source checks — batch 2 (Nginx, reverse proxy, HTTP security)
+
+- **TLS and HTTP-to-HTTPS — SOURCE PASS:** `nginx.conf.template` redirects port 80 to HTTPS and configures TLS 1.2/1.3. Docker Verification passed its generated-TLS endpoint/reverse-proxy checks on the audit report commit. This is CI-stack evidence, not production certificate/domain validation.
+- **Security headers — SOURCE PASS, browser-policy validation pending:** Nginx sets HSTS, nosniff, frame denial, Referrer-Policy, Permissions-Policy, CSP, COOP and CORP. Spring Security also sets CSP/frame/referrer/cross-origin headers. No confirmed defect from duplication alone; verify effective response headers in deployed browser flows before release.
+- **Forwarded client address — SOURCE PASS for direct Nginx-to-API topology:** `ops/proxy_params` overwrites `X-Real-IP` and `X-Forwarded-For` with Nginx's `$remote_addr`, preventing a caller-supplied forwarded-for value from being blindly passed through. If another trusted proxy/CDN is placed in front, its trust boundary and real-IP configuration need separate review.
+- **PDF import upload limit — PARTIAL / route coverage pending:** exact `/api/v1/admin/pdf-imports/upload` has a dedicated `wolfe_pdf_upload` limit (5 requests/minute, burst 2) and 50 MB body limit. The wider `/api/v1/admin/pdf-imports/` prefix has the body-size limit but no dedicated upload rate zone. Confirm the actual controller mappings and whether alternate/trailing-slash upload paths exist before treating this as a defect; do not assert bypass without a mapped endpoint/reproduction.
+- **Global API limit — SOURCE PASS:** other `/api/` paths receive the global API limit and request body/time limits. The PDF import prefix is handled earlier, so its behavior should be validated against real mappings as noted above.
+- **HTTP authorization — SOURCE PASS for URL rules:** `SecurityConfig` requires ADMIN/SUPER_ADMIN for `/api/v1/admin/**` and RETAILER for `/api/v1/retailer/**`; CSRF is enabled, CORS origins come from configuration, and the session policy is stateless. This does not substitute for controller/method-level checks on mapped endpoints.
+- **New confirmed security defects from this batch:** none. Remaining items above are route-mapping/browser/production evidence gates, not confirmed vulnerabilities.
+
 ## Next steps (G1 → G2)
 
 1. Add and run the duplicate-identical-order-lines regression test; assert merged quantity, discount allocation, and persisted totals.
-2. Inspect mapped admin/retailer endpoints for method-level authorization and DTO leakage, recording exact endpoints and tests; don't reopen already verified URL-role fixes.
-3. Add/confirm negative HTTP tests for invalid/expired JWTs on representative public and protected mapped endpoints.
-4. Verify checkout email-verification behavior from current source and targeted positive/negative tests.
-5. Add deterministic PostgreSQL concurrency tests for create/cancel lock ordering and retailer allocation; retain existing passing source-contract tests as evidence.
-6. Collect production Flyway history evidence without changing migration history based on assumptions.
-7. Keep G11 browser E2E, G12 production-like deployment/observability, and G13 independent acceptance as explicit release evidence gates.
-8. Reconcile the README and label older audit snapshots as archival; preserve previously fixed/verified status unless a specific regression is reproduced.
+2. Enumerate actual PDF-import controller mappings and verify all upload paths are rate-limited; only patch if an alternate mapped path is confirmed.
+3. Inspect mapped admin/retailer endpoints for method-level authorization and DTO leakage, recording exact endpoints and tests; don't reopen already verified URL-role fixes.
+4. Add/confirm negative HTTP tests for invalid/expired JWTs on representative public and protected mapped endpoints.
+5. Verify checkout email-verification behavior from current source and targeted positive/negative tests.
+6. Add deterministic PostgreSQL concurrency tests for create/cancel lock ordering and retailer allocation; retain existing passing source-contract tests as evidence.
+7. Collect production Flyway history evidence without changing migration history based on assumptions.
+8. Keep G11 browser E2E, G12 production-like deployment/observability, and G13 independent acceptance as explicit release evidence gates.
+9. Reconcile the README and label older audit snapshots as archival; preserve previously fixed/verified status unless a specific regression is reproduced.
 
 ## Certification statement
 
-This file records a **G0 baseline freeze and initial G1 source recheck**, not full G1 completion and not release certification. The current commit's two successful CI workflows are linked above. Historical closures are preserved; outstanding items are scoped test/evidence gates or confirmed gaps, not an instruction to reopen every old finding.
+This file records a **G0 baseline freeze and initial G1 source rechecks**, not full G1 completion and not release certification. Both workflows passed for frozen main, and both workflows also passed for the audit-report commit listed above. Historical closures are preserved; outstanding items are scoped test/evidence gates or confirmed capability/documentation gaps, not an instruction to reopen every old finding.
