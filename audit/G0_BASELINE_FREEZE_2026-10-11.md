@@ -278,3 +278,19 @@ This file records a **G0 baseline freeze and initial G1 source rechecks**, not f
 1. Verify CI and Docker Verification for the latest commit containing the post-recovery no-repayout fix.
 2. Inspect failures from the new cash/recovery tests and repair source/test only based on evidence.
 3. If green, inspect `setCashExpected` call sites and settlement amount invariants; change production code only for a confirmed reachable unsafe state.
+
+
+## G1 source checks — batch 16 (cash reconciliation replay)
+
+- CI evidence confirmed for commit `c88aa56227014a3914f744239e0d0549e71bee7c`: Wolfe CI PASS and Docker Verification PASS, covering the post-recovery duplicate-payout fix and its regression test.
+- **Confirmed source defect found:** `RetailerSettlementService.reconcileCash` checked only settlement status ELIGIBLE and expected amount. After a successful reconciliation the settlement remains ELIGIBLE; a repeated reconciliation could overwrite the stored cash reference and amounts while producing another audit entry, with no explicit correction workflow.
+- **Production fix:** service now rejects reconciliation when `cashReconciliationStatus == RECONCILED`, directing corrections to an explicit audited workflow. Existing amount matching and exact collected/deposited equality checks remain.
+- **Regression test added:** `cashReconciliationReplayCannotReplaceRecordedReferenceOrAmounts` performs one successful reconciliation, attempts a replay with a different reference, asserts rejection, verifies the original reference/amounts remain and confirms only one save/audit event.
+- Commits: source fix `d85f968d0bb9c1c3a22b1bc6244cb68b87b0f89e`; test `09486f38ac1c2acdf1dc4049fdaf6bf14702f754`. CI and Docker Verification for this new batch are pending; do not mark verified until both pass.
+- No OTP/authentication code changed; `main` remains untouched.
+
+## Next steps
+
+1. Verify CI and Docker Verification for the latest cash-reconciliation replay fix.
+2. If green, inspect `setCashExpected` call sites and ensure expected amounts cannot be changed after reconciliation or payout; patch only with confirmed reachable source evidence.
+3. Preserve prior closed fixes and distinguish source-corrected from CI-verified status.
