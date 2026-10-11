@@ -181,3 +181,11 @@ This file records a **G0 baseline freeze and initial G1 source rechecks**, not f
 2. Verify Docker Verification for the current branch head.
 3. Continue with another real mutation route only after current CI passes, then review retailer data serialization for sensitive fields with concrete field-level evidence.
 4. Keep production Flyway history, browser E2E, production-like deployment/observability, and independent G13 acceptance as evidence gates.
+
+
+## G1 source checks — batch 9 (positive authorization control)
+
+- Added `adminWithExplicitRetailerPermissionCanReadMappedEndpoint` to `AdminRetailerControllerHttpSecurityTest`. In addition to anonymous/CUSTOMER/role-only negative tests, it asserts that an admin principal with both `ROLE_ADMIN` and `PERM_ADMIN_RETAILER` receives HTTP 200 from the actual `GET /api/v1/admin/retailers` mapping.
+- This is a positive control to prevent a false-green suite that blocks every caller. It uses a mock principal with explicit production authority; it does not prove JWT issuance/integration itself, which remains covered by the separate JWT security suite.
+- Commit: `6ed6936368e41a578da303f408b4a554e8ffbe62`. Its Wolfe CI and Docker Verification must complete before these added tests are marked verified.
+- Production source was not changed because the controller permission and role-permission mapping are aligned in the inspected source. No OTP code or authentication flow was changed.
