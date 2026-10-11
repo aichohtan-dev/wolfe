@@ -14,8 +14,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 public class CorrelationIdFilter extends OncePerRequestFilter {
     public static final String HEADER = "X-Correlation-ID";
     @Override protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain) throws ServletException, IOException {
-        String supplied = request.getHeader(HEADER);
-        String id = supplied != null && supplied.matches("[A-Za-z0-9._-]{8,80}") ? supplied : UUID.randomUUID().toString();
+        String id = UUID.randomUUID().toString();
         response.setHeader(HEADER, id);
         try { MDC.put("correlationId", id); chain.doFilter(request, response); } finally { MDC.remove("correlationId"); }
     }
