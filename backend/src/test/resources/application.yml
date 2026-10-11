@@ -20,9 +20,15 @@ spring:
   data:
     redis:
       url: ${REDIS_URL:redis://localhost:6379}
-WOLFE_JWT_SECRET: "test-jwt-secret-key-that-is-at-least-32-chars-long-12345"
-WOLFE_JWT_TTL_SECONDS: 900
-WOLFE_FRONTEND_ORIGIN: "http://localhost:5173"
+wolfe:
+  security:
+    jwt-secret: ${WOLFE_JWT_SECRET:test-jwt-secret-key-that-is-at-least-32-chars-long-12345}
+    jwt-issuer: ${WOLFE_JWT_ISSUER:wolfe-api}
+    jwt-audience: ${WOLFE_JWT_AUDIENCE:wolfe-web}
+    jwt-kid: ${WOLFE_JWT_KID:primary}
+    jwt-keys: ${WOLFE_JWT_KEYS:}
+    frontend-origins: ${WOLFE_FRONTEND_ORIGINS:${WOLFE_FRONTEND_ORIGIN:http://localhost:5173}}
+    secure-cookies: ${WOLFE_SECURE_COOKIES:false}
 management:
   endpoints:
     web:
