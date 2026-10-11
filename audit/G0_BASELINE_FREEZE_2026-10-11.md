@@ -118,3 +118,19 @@ This file records a **G0 baseline freeze and initial G1 source rechecks**, not f
 2. Continue mapped endpoint ownership/permission review for cart, order, retailer, admin, and PDF-import handlers; add negative tests only where there is a meaningful uncovered boundary.
 3. Preserve the passing JWT, refresh-token, and URL role-matrix tests as closed; don't reopen without a reproduced regression.
 4. Keep production Flyway history, browser E2E, production-like deployment/observability, and independent G13 acceptance as explicit evidence gates.
+
+
+## G1 source checks — batch 5 (checkout email-verification enforcement)
+
+- **Source control already exists:** `OrderService.create` locks the customer row and rejects checkout with `email verification is required before placing a COD order` when `Customer.isEmailVerified()` is false. This check runs before idempotency/count checks, product reads, coupon allocation, inventory reservation, and order persistence. Do not reopen the older generic email-verification finding as an existing source defect.
+- **Regression test added:** `OrderServiceValidationTest.rejectsCheckoutWhenCustomerEmailIsUnverifiedBeforeOrderOrStockMutation` builds the service with a real unverified customer entity and mocked repositories, asserts the explicit rejection, and verifies no order/product/inventory/coupon/notification side effects occur.
+- **Verification state:** committed to the audit branch; the commit's CI must complete before calling this test PASS.
+- **Address ownership regression:** `CustomerAddressControllerSecurityTest` covers cross-customer list/update/delete checks. Its CI is also tracked separately; do not infer its status from an earlier commit's green run.
+- **Current scope:** no production checkout code changed because source enforcement is present. This batch adds regression coverage rather than altering the authentication/OTP flow.
+
+## Next steps (G1 continuation)
+
+1. Verify CI for the checkout email-verification regression and address ownership regression on the latest commit.
+2. If a test fails, inspect the actual failure logs and repair the test/setup without removing security assertions.
+3. Continue endpoint mapping and DTO boundary checks; only patch production source when a concrete defect is shown.
+4. Keep G11 browser E2E, production Flyway compatibility, production-like deployment/observability, and independent G13 acceptance as evidence gates.
