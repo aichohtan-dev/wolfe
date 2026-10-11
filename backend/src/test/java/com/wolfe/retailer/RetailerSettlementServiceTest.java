@@ -110,4 +110,66 @@ public class RetailerSettlementServiceTest {
         assertEquals("BANK-REF-42", eligible.getReferenceNumber());
     }
 
+
+    @Test
+    void cashReconciliationRejectsPendingSettlementWithoutSavingOrAuditing() {
+        RetailerSettlement pending = new RetailerSettlement("WLF-CASH-PENDING", 7L, 10000L, 1000L, 9000L);
+        pending.setCashExpected(9000L);
+        when(settlementRepo.findByIdForUpdate(51L)).thenReturn(Optional.of(pending));
+
+        assertThrows(IllegalStateException.class,
+                () -> service.reconcileCash(51L, 9000L, 9000L, 9000L, "CASH-REF-51", "admin"));
+
+        verify(settlementRepo, never()).save(any());
+        verifyNoInteractions(auditRepo);
+    }
+
+    @Test
+    void cashReconciliationRejectsCollectedOrDepositedMismatch() {
+        RetailerSettlement eligible = new RetailerSettlement("WLF-CASH-MISMATCH", 7L, 10000L, 1000L, 9000L);
+        eligible.setCashExpected(9000L);
+        eligible.markEligible();
+        when(settlementRepo.findByIdForUpdate(52L)).thenReturn(Optional.of(eligible));
+
+        assertThrows(IllegalArgumentException.class,
+                () -> service.reconcileCash(52L, 9000L, 8000L, 9000L, "CASH-REF-52", "admin"));
+
+        verify(settlementRepo, never()).save(any());
+        verifyNoInteractions(auditRepo);
+    }
+
+    @Test
+    void recoveryCollectionRejectsWhenNoRecoveryIsDue() {
+        RetailerSettlement eligible = new RetailerSettlement("WLF-NO-RECOVERY", 7L, 10000L, 1000L, 9000L);
+        eligible.markEligible();
+        when(settlementRepo.findByIdForUpdate(53L)).thenReturn(Optional.of(eligible));
+
+        assertThrows(IllegalStateException.class,
+                () -> service.collectRecovery(53L, "RECOVERY-REF-53", "admin"));
+
+        verify(settlementRepo, never()).save(any());
+        verifyNoInteractions(auditRepo);
+    }
+
+    @Test
+    void recoveryCollectionClearsRecoveryAndAllowsNormalEligiblePayout() {
+        RetailerSettlement recoveryDue = new RetailerSettlement("WLF-RECOVERY-DUE", 7L, 10000L, 1000L, 9000L);
+        recoveryDue.markEligible();
+        recoveryDue.markSettled("BANK-REF-54");
+        recoveryDue.markAdjustedForReturn(1000L, "partial return after payout");
+        assertEquals("RECOVERY_DUE", recoveryDue.getStatus());
+        assertEquals(1000L, recoveryDue.getRecoveryDueAmount());
+        when(settlementRepo.findByIdForUpdate(54L)).thenReturn(Optional.of(recoveryDue));
+        when(settlementRepo.save(any())).thenAnswer(i -> i.getArgument(0));
+
+        RetailerSettlement recovered = service.collectRecovery(54L, "RECOVERY-REF-54", "admin");
+
+        assertEquals("ELIGIBLE", recovered.getStatus());
+        assertEquals(0L, recovered.getRecoveryDueAmount());
+        RetailerSettlement settledAgain = service.markSettled(54L, "BANK-REF-54-SECOND", "admin");
+        assertEquals("SETTLED", settledAgain.getStatus());
+        verify(settlementRepo, times(2)).save(recoveryDue);
+        verify(auditRepo, times(2)).save(any(RetailerAuditLog.class));
+    }
+
 }
