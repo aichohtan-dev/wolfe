@@ -65,4 +65,12 @@ springdoc:
     enabled: ${WOLFE_OPENAPI_ENABLED:false}
     path: /swagger-ui.html
 
-
+wolfe:
+  security:
+    jwt-secret: ${WOLFE_JWT_SECRET:}
+    jwt-issuer: ${WOLFE_JWT_ISSUER:wolfe-api}
+    jwt-audience: ${WOLFE_JWT_AUDIENCE:wolfe-web}
+    jwt-kid: ${WOLFE_JWT_KID:primary}
+    jwt-keys: ${WOLFE_JWT_KEYS:}
+    frontend-origins: ${WOLFE_FRONTEND_ORIGINS:${WOLFE_FRONTEND_ORIGIN:http://localhost:5173}}
+    secure-cookies: ${WOLFE_SECURE_COOKIES:true}
