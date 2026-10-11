@@ -189,3 +189,18 @@ This file records a **G0 baseline freeze and initial G1 source rechecks**, not f
 - This is a positive control to prevent a false-green suite that blocks every caller. It uses a mock principal with explicit production authority; it does not prove JWT issuance/integration itself, which remains covered by the separate JWT security suite.
 - Commit: `6ed6936368e41a578da303f408b4a554e8ffbe62`. Its Wolfe CI and Docker Verification must complete before these added tests are marked verified.
 - Production source was not changed because the controller permission and role-permission mapping are aligned in the inspected source. No OTP code or authentication flow was changed.
+
+
+## G1 source checks — batch 10 (retailer stock adjustment authorization)
+
+- Added three negative HTTP integration tests for the actual `POST /api/v1/admin/retailers/{id}/inventory/adjust` mapping: anonymous -> 401, CUSTOMER -> 403, and ROLE_ADMIN without `PERM_ADMIN_RETAILER` -> 403.
+- CSRF token is included to isolate authorization behavior. The request uses a test-only SKU and nonexistent retailer id; each expected denial should happen before controller/service side effects.
+- Production source reviewed: the handler is under class-level `@PreAuthorize("hasAuthority('PERM_ADMIN_RETAILER')")`; the role-only negative control is intended to assert the explicit permission boundary.
+- Test commit: `7eeb63af9499cfa84575a6a90b320d9deff5b79f`. CI and Docker Verification for this commit must finish before the new stock-adjustment tests are marked PASS.
+- Existing positive control (ROLE_ADMIN + PERM_ADMIN_RETAILER -> GET 200) remains in the same test class, so the suite tests both denial and allowed access.
+
+## Next steps
+
+1. Check latest CI results and inspect backend test logs for the new stock-adjustment cases.
+2. If a test fails, correct test configuration or assertions based on logs; do not weaken security assertions merely to obtain green CI.
+3. Once this batch passes, move to the mapped retailer settlement mutation route and test its authorization boundary.
