@@ -58,7 +58,8 @@ import static com.wolfe.security.CustomerAccess.requireCustomer;
     }
 
     @GetMapping("/product/{slug}/mine") public ReviewView mine(@PathVariable String slug, Authentication auth) {
-        Long cid = requireCustomer(auth);
+        if (auth == null || !(auth.getDetails() instanceof Long cid)) throw new org.springframework.security.access.AccessDeniedException("Customer authentication required");
+        requireCustomer(auth, cid);
         var p = products.findBySlugIgnoreCase(slug.trim()).filter(ProductReviewController::activeProduct)
                 .orElseThrow(() -> new NoSuchElementException("Product not found"));
         return reviews.findByProductIdAndCustomerId(p.getId(), cid)
