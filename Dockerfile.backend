@@ -1,4 +1,4 @@
-FROM eclipse-temurin@sha256:6ea5548706b60ac0a602eaf48af74792cbab012d90e811ca8db6184b16b5c3d6 AS build
+FROM eclipse-temurin@sha256:2d5d5e9b533342a565907c84f47a2ec298c40cde7b13a3ca85d4950fa456a641 AS build
 WORKDIR /app
 RUN apk add --no-cache curl unzip
 COPY backend/.mvn .mvn
@@ -6,7 +6,7 @@ COPY backend/mvnw backend/mvnw.cmd backend/pom.xml ./
 COPY backend/src src
 RUN chmod +x mvnw && ./mvnw -q -Pdocker test && ./mvnw -q -Pdocker package -DskipTests=false
 
-FROM eclipse-temurin:21-jre-alpine@sha256:1a29e1fe337eb28b5bec30f0ee8ed29f0ff80ab6f75dcf9313efe82911065a52
+FROM eclipse-temurin:24-jre-alpine@sha256:4044b6c87cb088885bcd0220f7dc7a8a4aab76577605fa471945d2e98270741f
 WORKDIR /app
 RUN addgroup -S wolfe && adduser -S wolfe -G wolfe \
     && mkdir -p /app/public/catalog/imports /app/public/catalog/published \
