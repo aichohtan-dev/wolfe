@@ -18,7 +18,7 @@ A source-level fix is not runtime PASS. Every closure must cite the tested commi
 | Gate | Scope | Initial status | Required next evidence |
 |---|---|---|---|
 | G0 | Baseline and source freeze | PARTIAL | Baseline SHA recorded; reconcile open G0 PR #43 and prove no later main changes |
-| G1 | Architecture and trust boundaries | NOT VERIFIED | Complete source/data-flow map and trust-boundary review |
+| G1 | Architecture and trust boundaries | PARTIAL | Source review recorded; G1-TRUST-001, G1-DEPLOY-002, G1-TRUST-003 and G5-RETAILER-ONBOARD-001 remain open/not verified |
 | G2 | Frontend/backend API contract | NOT VERIFIED | Endpoint inventory, DTO parity, positive/negative contract tests |
 | G3 | Authentication/session/authorization | FIXED-SOURCE / NOT VERIFIED | Full HTTP role matrix, CSRF, stale-cookie, refresh-reuse and account-isolation runtime tests |
 | G4 | Catalog/cart/configurator/bundle | FIXED-SOURCE / NOT VERIFIED | Contract, pricing, ownership, expiry and concurrency regression tests |
@@ -67,6 +67,17 @@ A source-level fix is not runtime PASS. Every closure must cite the tested commi
 7. The old 001–100 ledger reports 100 GREEN, but the 2026-10-11 reconciliation explicitly supersedes that as certification evidence and carries forward 3 P1 plus additional P2/related entries. Do not advertise 100/100 certified.
 8. `JwtAuthFilter` currently clears invalid optional-cookie authentication and continues the filter chain; `SecurityConfig` currently aligns `/api/v1/retailer/**` with ROLE_RETAILER. These are positive source observations, not runtime PASS.
 
+## G1 findings added 2026-11-24
+
+| Finding ID | Severity | Status | Summary |
+|---|---:|---|---|
+| G1-TRUST-001 | P2 | OPEN | Flat default Compose network gives frontend/Nginx unnecessary network reachability to PostgreSQL and Redis; segment edge and data networks |
+| G1-DEPLOY-002 | P2 | NOT VERIFIED | TLS termination model is ambiguous; upstream TLS termination forwarding HTTP to Nginx port 80 can cause HTTPS redirect loops |
+| G1-TRUST-003 | P2 | NOT VERIFIED | Client-IP/rate-limit identity depends on whether Nginx is directly public or behind a trusted load balancer |
+| G5-RETAILER-ONBOARD-001 | P2 | OPEN | New Retailer defaults to ACTIVE/VERIFIED/SIGNED; allocation considers ACTIVE+VERIFIED and does not require linked userId |
+
+G1 detailed evidence and remediation plan: `audit/WOLFE_G1_ARCHITECTURE_TRUST_BOUNDARY_2026-11-24.md`.
+
 ## Evidence links
 
 - Main baseline: https://github.com/aichohtan-dev/wolfe/commit/86208f6edf5bbb7104dc26bdf806c01970818692
@@ -90,7 +101,7 @@ A source-level fix is not runtime PASS. Every closure must cite the tested commi
 - [x] Reconcile legacy 100/100 ledger against the later canonical reconciliation.
 - [x] Inspect CI workflow definitions and selected security/retailer/order source files.
 - [x] Inspect selected PR CI job outcomes and failure logs.
-- [ ] Complete G1 architecture/trust-boundary review.
+- [x] Complete initial G1 architecture/trust-boundary source review; G1 remains PARTIAL pending deployment/runtime proof.
 - [ ] Complete G2 frontend/backend contract inventory.
 - [ ] Re-test G3–G8 findings against the frozen source and CI.
 - [ ] Complete G9 migration/concurrency verification.
@@ -99,4 +110,4 @@ A source-level fix is not runtime PASS. Every closure must cite the tested commi
 - [ ] Execute G12 deployment/backup/restore/observability evidence.
 - [ ] Complete independent G13 Reality Checker review.
 
-**Current disposition:** Full Zero-Gap certification is BLOCKED. This tracker is an initial evidence-based checkpoint, not a final audit report.
+**Current disposition:** Full Zero-Gap certification is BLOCKED. G1 initial source review is PARTIAL; four findings were recorded, including one carried into G5. This tracker is an initial evidence-based checkpoint, not a final audit report.
